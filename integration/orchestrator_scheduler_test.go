@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/startower-observability/blackcat/orchestrator"
-	"github.com/startower-observability/blackcat/scheduler"
+	"github.com/startower-observability/blackcat/internal/orchestrator"
+	"github.com/startower-observability/blackcat/internal/scheduler"
 )
 
 func TestOrchestratorSchedulerTriggersOrchestrator(t *testing.T) {

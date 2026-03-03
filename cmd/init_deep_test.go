@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/types"
+	"github.com/startower-observability/blackcat/internal/types"
 )
 
 func TestInitDeepDepthCap(t *testing.T) {

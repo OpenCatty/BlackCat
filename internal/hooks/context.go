@@ -1,6 +1,6 @@
 package hooks
 
-import "github.com/startower-observability/blackcat/types"
+import "github.com/startower-observability/blackcat/internal/types"
 
 // HookContext carries event-specific data through hook handlers.
 type HookContext struct {

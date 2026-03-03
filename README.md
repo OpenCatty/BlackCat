@@ -90,7 +90,7 @@ make deploy
 This single command:
 - Pushes your local git changes to the remote
 - SSHes into the VM, pulls the latest code, and builds the binary
-- Installs the binary to `/usr/local/bin/blackcat`
+- Installs the binary to `~/.blackcat/bin/blackcat`
 - Deploys and reloads the `blackcat` and `opencode` systemd services
 - Runs a health check to confirm the service is up
 

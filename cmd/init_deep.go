@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/config"
-	"github.com/startower-observability/blackcat/llm"
-	"github.com/startower-observability/blackcat/llm/copilot"
-	"github.com/startower-observability/blackcat/llm/gemini"
-	"github.com/startower-observability/blackcat/llm/zen"
-	"github.com/startower-observability/blackcat/types"
+	"github.com/startower-observability/blackcat/internal/config"
+	"github.com/startower-observability/blackcat/internal/llm"
+	"github.com/startower-observability/blackcat/internal/llm/copilot"
+	"github.com/startower-observability/blackcat/internal/llm/gemini"
+	"github.com/startower-observability/blackcat/internal/llm/zen"
+	"github.com/startower-observability/blackcat/internal/types"
 )
 
 const (

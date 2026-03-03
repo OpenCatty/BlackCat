@@ -9,8 +9,8 @@ import (
 
 	"github.com/startower-observability/blackcat/internal/hooks"
 	"github.com/startower-observability/blackcat/internal/rules"
-	"github.com/startower-observability/blackcat/types"
-	"github.com/startower-observability/blackcat/workspace"
+	"github.com/startower-observability/blackcat/internal/types"
+	"github.com/startower-observability/blackcat/internal/workspace"
 )
 
 func TestHooksRulesIntegration(t *testing.T) {

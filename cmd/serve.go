@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/opencode"
+	"github.com/startower-observability/blackcat/internal/opencode"
 )
 
 var serveCmd = &cobra.Command{

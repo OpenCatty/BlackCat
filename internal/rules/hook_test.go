@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/startower-observability/blackcat/internal/hooks"
-	"github.com/startower-observability/blackcat/types"
+	"github.com/startower-observability/blackcat/internal/types"
 )
 
 func TestHookInjection(t *testing.T) {

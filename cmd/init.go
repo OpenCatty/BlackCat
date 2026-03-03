@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/workspace"
+	"github.com/startower-observability/blackcat/internal/workspace"
 )
 
 var initCmd = &cobra.Command{

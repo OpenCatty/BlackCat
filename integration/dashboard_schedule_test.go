@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/startower-observability/blackcat/config"
-	"github.com/startower-observability/blackcat/dashboard"
-	"github.com/startower-observability/blackcat/scheduler"
+	"github.com/startower-observability/blackcat/internal/config"
+	"github.com/startower-observability/blackcat/internal/dashboard"
+	"github.com/startower-observability/blackcat/internal/scheduler"
 )
 
 // dashboardMockTaskDetailLister implements dashboard.TaskDetailLister

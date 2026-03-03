@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/security"
+	"github.com/startower-observability/blackcat/internal/security"
 )
 
 var vaultCmd = &cobra.Command{

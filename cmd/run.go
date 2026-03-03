@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/startower-observability/blackcat/agent"
-	"github.com/startower-observability/blackcat/opencode"
+	"github.com/startower-observability/blackcat/internal/agent"
+	"github.com/startower-observability/blackcat/internal/opencode"
 )
 
 var runCmd = &cobra.Command{

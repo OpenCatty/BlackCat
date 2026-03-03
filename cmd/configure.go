@@ -12,9 +12,9 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/config"
-	"github.com/startower-observability/blackcat/oauth"
-	"github.com/startower-observability/blackcat/security"
+	"github.com/startower-observability/blackcat/internal/config"
+	"github.com/startower-observability/blackcat/internal/oauth"
+	"github.com/startower-observability/blackcat/internal/security"
 )
 
 var (

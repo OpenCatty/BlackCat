@@ -16,12 +16,12 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/startower-observability/blackcat/config"
-	"github.com/startower-observability/blackcat/dashboard"
+	"github.com/startower-observability/blackcat/internal/config"
+	"github.com/startower-observability/blackcat/internal/dashboard"
 	"github.com/startower-observability/blackcat/internal/daemon"
-	"github.com/startower-observability/blackcat/scheduler"
-	"github.com/startower-observability/blackcat/session"
-	"github.com/startower-observability/blackcat/types"
+	"github.com/startower-observability/blackcat/internal/scheduler"
+	"github.com/startower-observability/blackcat/internal/session"
+	"github.com/startower-observability/blackcat/internal/types"
 )
 
 type mockSubsystemManager struct {

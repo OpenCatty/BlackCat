@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/channel/whatsapp"
+	"github.com/startower-observability/blackcat/internal/channel/whatsapp"
 )
 
 func loginWhatsApp(cmd *cobra.Command, args []string) error {

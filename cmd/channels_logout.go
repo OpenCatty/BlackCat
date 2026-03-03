@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/startower-observability/blackcat/config"
+	"github.com/startower-observability/blackcat/internal/config"
 )
 
 var channelsLogoutCmd = &cobra.Command{
