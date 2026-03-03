@@ -1,0 +1,49 @@
+# BlackCat Makefile
+# Usage: make [target]
+
+BINARY  := blackcat
+GOOS    ?= $(shell go env GOOS)
+GOARCH  ?= $(shell go env GOARCH)
+
+.PHONY: build build-linux test vet deploy deploy-no-push verify clean help
+
+## build: Build binary for current OS/arch
+build:
+	go build -o $(BINARY) .
+
+## build-linux: Cross-compile for Linux amd64 (for VM deploy)
+build-linux:
+	GOOS=linux GOARCH=amd64 go build -o $(BINARY)-linux-amd64 .
+
+## test: Run all tests
+test:
+	CGO_ENABLED=0 go test ./...
+
+## vet: Run go vet
+vet:
+	go vet ./...
+
+## deploy: Deploy to VM (push, build on VM, install, restart, health check)
+deploy:
+	bash scripts/deploy.sh
+
+## deploy-no-push: Deploy without git push (useful for quick redeploys)
+deploy-no-push:
+	bash scripts/deploy.sh --no-push
+
+## verify: Run health check against deployed VM
+verify:
+	@bash -c 'source deploy/deploy.env 2>/dev/null || true; \
+	  HOST=$${DEPLOY_HOST:-}; \
+	  if [ -z "$$HOST" ]; then echo "DEPLOY_HOST not set in deploy/deploy.env"; exit 1; fi; \
+	  URL="http://$$HOST:8080/health"; \
+	  echo "Checking $$URL ..."; \
+	  curl -sf "$$URL" && echo " OK" || (echo " FAIL"; exit 1)'
+
+## clean: Remove built binary artifacts
+clean:
+	rm -f $(BINARY) $(BINARY)-linux-amd64
+
+## help: Show this help message
+help:
+	@grep -E '^## [a-z]' Makefile | sed 's/## /  make /' | column -t -s ':'

@@ -1,0 +1,20 @@
+[Unit]
+Description=BlackCat AI Agent Daemon
+After=network.target opencode.service
+Requires=opencode.service
+
+[Service]
+Type=simple
+User=__DEPLOY_USER__
+Group=__DEPLOY_GROUP__
+WorkingDirectory=__DEPLOY_HOME__/blackcat
+ExecStart=__BLACKCAT_BINARY__ daemon --config __DEPLOY_CONFIG_PATH__
+Restart=always
+RestartSec=10
+Environment=PATH=/usr/local/bin:/usr/local/go/bin:__DEPLOY_HOME__/go/bin:/usr/bin:/bin
+Environment=HOME=__DEPLOY_HOME__
+Environment=XDG_CONFIG_HOME=__DEPLOY_HOME__/.config
+Environment=BLACKCAT_VAULT_PASSPHRASE=__VAULT_PASSPHRASE__
+
+[Install]
+WantedBy=multi-user.target

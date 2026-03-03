@@ -1,0 +1,46 @@
+services:
+  blackcat:
+    build: .
+    container_name: blackcat
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./blackcat.yaml:/etc/blackcat/config.yaml:ro
+      - blackcat-data:/root/.blackcat
+    environment:
+      - BLACKCAT_CONFIG=/etc/blackcat/config.yaml
+      - BLACKCAT_LLM_APIKEY=${BLACKCAT_LLM_APIKEY}
+      - BLACKCAT_CHANNELS_TELEGRAM_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BLACKCAT_CHANNELS_DISCORD_TOKEN=${DISCORD_BOT_TOKEN}
+      - BLACKCAT_VAULT_PASSPHRASE=${VAULT_PASSPHRASE}
+      - BLACKCAT_OPENCODE_ADDR=http://opencode:4096
+    depends_on:
+      opencode:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  opencode:
+    image: ghcr.io/opencode-ai/opencode:latest
+    container_name: opencode
+    restart: unless-stopped
+    ports:
+      - "4096:4096"
+    volumes:
+      - ./workspace:/workspace
+    environment:
+      - OPENCODE_SERVER_PASSWORD=${OPENCODE_PASSWORD}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4096/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  blackcat-data:

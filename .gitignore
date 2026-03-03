@@ -1,0 +1,44 @@
+# Build artifacts
+/blackcat
+/blackcat.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Junk files (Windows NUL device artifact)
+NUL
+*NUL_test_output*
+.sisyphus_test_output.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Research docs
+Research_Design_Architecture_InterStellar.md
+
+# VitePress docs site
+website/node_modules/
+website/.vitepress/cache/
+website/.vitepress/dist/
+
+# Sisyphus agent workspace
+.sisyphus/

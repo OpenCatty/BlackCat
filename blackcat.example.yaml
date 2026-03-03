@@ -1,0 +1,249 @@
+# BlackCat Configuration Example
+# This is a comprehensive example of all available configuration options.
+# Copy this to ~/.blackcat.yaml or the location specified by --config flag.
+
+# Server configuration - HTTP server settings
+server:
+  # HTTP listen address (e.g., ":8080" or "0.0.0.0:8080")
+  addr: ":8080"
+  # HTTP listen port (typically matches port in addr above)
+  port: 8080
+
+# OpenCode agent configuration
+opencode:
+  # OpenCode agent address (e.g., "http://127.0.0.1:4096")
+  addr: "http://127.0.0.1:4096"
+  # OpenCode agent password - REQUIRED
+  # Set via environment variable: BLACKCAT_OPENCODE_PASSWORD
+  # Or store in vault file (~/.blackcat/vault.json)
+  password: "" # Set via env or vault
+  # Request timeout duration. Accepts Go duration strings ("30m", "1h", "5s")
+  # or integer seconds (e.g., 1800 for 30 minutes).
+  timeout: "30m"
+
+# LLM (Language Model) configuration
+llm:
+  # LLM provider (e.g., "openai", "anthropic", "ollama", "localai")
+  provider: "openai"
+  # Model name (e.g., "gpt-5.2", "gpt-4.1", "claude-sonnet-4-6")
+  model: "gpt-5.2"
+  # API key for the LLM provider
+  # Set via environment variable: BLACKCAT_LLM_APIKEY
+  # Or store in vault file (~/.blackcat/vault.json)
+  apiKey: "" # Set via env or vault
+  # Optional: Custom base URL for the LLM API
+  # Useful for local models or proxy setups
+  baseURL: ""
+  # Temperature: Controls randomness (0.0 = deterministic, 2.0 = very random)
+  # Recommended: 0.7 for balanced creativity and consistency
+  temperature: 0.7
+  # Maximum tokens per response
+  maxTokens: 4096
+
+# Communication channels configuration
+channels:
+  # Telegram integration
+  telegram:
+    # Enable Telegram support
+    enabled: false
+    # Telegram bot token
+    # Set via environment variable: BLACKCAT_CHANNELS_TELEGRAM_TOKEN
+    # Or store in vault file (~/.blackcat/vault.json)
+    token: "" # Set via env or vault
+
+  # Discord integration
+  discord:
+    # Enable Discord support
+    enabled: false
+    # Discord bot token
+    # Set via environment variable: BLACKCAT_CHANNELS_DISCORD_TOKEN
+    # Or store in vault file (~/.blackcat/vault.json)
+    token: "" # Set via env or vault
+
+  # WhatsApp integration
+  whatsapp:
+    # Enable WhatsApp support
+    enabled: false
+    # WhatsApp API token/credentials
+    # Set via environment variable: BLACKCAT_CHANNELS_WHATSAPP_TOKEN
+    # Or store in vault file (~/.blackcat/vault.json)
+    token: "" # Set via env or vault
+    # Phone number whitelist (E.164 format). Only these numbers can send messages.
+    # Leave empty or omit to allow all senders. Use "*" to explicitly allow all.
+    # Example: ["+628123456789", "+6281234567890"]
+    # allowFrom:
+    #   - "+628123456789"
+
+# Security configuration
+security:
+  # Path to vault file for storing secrets
+  # Use ~ to reference home directory (e.g., "~/.blackcat/vault.json")
+  vaultPath: "~/.blackcat/vault.json"
+  # Patterns to deny (e.g., dangerous commands, file patterns)
+  # Example: ["rm -rf", "dd if="]
+  denyPatterns: []
+  # Auto-permit requests without confirmation
+  autoPermit: false
+
+# Memory/Knowledge consolidation configuration
+memory:
+  # Path to memory file (where consolidated knowledge is stored)
+  filePath: "MEMORY.md"
+  # Number of entries before consolidation is triggered
+  consolidationThreshold: 50
+
+# MCP (Model Control Protocol) server configurations
+mcp:
+  # List of MCP servers to start
+  servers: []
+  # Example MCP server configuration:
+  # - name: "my-mcp-server"
+  #   command: "/usr/local/bin/mcp-server"
+  #   args:
+  #     - "--config"
+  #     - "/etc/mcp/config.yaml"
+  #   env:
+  #     LOG_LEVEL: "debug"
+  #     CUSTOM_VAR: "value"
+
+# Skills configuration
+skills:
+  # Directory where custom skills are stored
+  # Skills are loaded from this directory at startup
+  dir: "skills/"
+
+# Logging configuration
+logging:
+  # Log level: "debug", "info", "warn", "error"
+  level: "info"
+  # Log format: "text" for human-readable, "json" for machine-readable
+  format: "text"
+
+# Environment Variable Overrides
+# All configuration values can be overridden using environment variables
+# with the BLACKCAT_ prefix, using nested key names in UPPER_CASE.
+# Examples:
+#   BLACKCAT_SERVER_ADDR=":9000"
+#   BLACKCAT_LLM_PROVIDER="anthropic"
+#   BLACKCAT_LLM_TEMPERATURE="0.5"
+#   BLACKCAT_CHANNELS_TELEGRAM_TOKEN="your-token"
+#   BLACKCAT_LOGGING_LEVEL="debug"
+
+# OAuth authentication configuration
+# Required for providers that use OAuth (Copilot, Antigravity).
+# Tokens are stored in the encrypted vault after authentication.
+oauth:
+  # GitHub Copilot — uses OAuth 2.0 Device Code Flow (RFC 8628)
+  copilot:
+    # Enable Copilot OAuth integration
+    enabled: false
+    # GitHub OAuth app client ID (default: VS Code client ID)
+    # clientID: "01ab8ac9400c4e429b23"
+
+  # Antigravity (Google IDE) — uses OAuth 2.0 PKCE Flow
+  # WARNING: Uses Google's internal API. May violate Terms of Service.
+  antigravity:
+    # Enable Antigravity OAuth integration
+    enabled: false
+    # REQUIRED: You must explicitly accept the ToS risk
+    acceptedToS: false
+    # Google OAuth client ID and secret (defaults built-in)
+    # clientID: "1071006060591-..."
+    # clientSecret: "GOCSPX-..."
+
+# Zen Coding Plan — curated hosted models via OpenCode API
+# Provides access to high-quality models with a single API key.
+zen:
+  # Enable Zen provider
+  enabled: false
+  # Zen API key
+  # Set via environment variable: BLACKCAT_ZEN_APIKEY
+  apiKey: "" # Set via env or vault
+  # Zen API base URL (default: https://api.opencode.ai/v1)
+  baseURL: "https://api.opencode.ai/v1"
+  # Override the curated model list (leave empty for defaults)
+  # Default models: opencode/claude-opus-4-6, opencode/claude-sonnet-4-6, opencode/gemini-3.1-pro
+  models: []
+
+# Per-provider enable/model settings
+# These configure the new backend providers alongside the primary llm.* settings.
+# The daemon auto-detects active backends in priority order:
+#   copilot > antigravity > gemini > zen > fallback to llm.*
+providers:
+  # OpenAI provider configuration
+  openai:
+    # Enable OpenAI provider
+    enabled: false
+    # Model name (e.g., "gpt-5.2", "gpt-4.1", "gpt-4o")
+    model: "gpt-5.2"
+  # API key - Set via env: BLACKCAT_LLM_APIKEY or store in vault
+    apiKey: "" # Set via env or vault
+    # Optional: Custom base URL for Azure or proxy setups
+    baseURL: ""
+
+  # GitHub Copilot LLM provider (requires oauth.copilot to be configured)
+  copilot:
+    enabled: false
+    # model: "gpt-4.1"
+
+  # Antigravity LLM provider (requires oauth.antigravity to be configured)
+  antigravity:
+    enabled: false
+    # model: "gemini-2.5-pro"
+
+  # Google Gemini official API (API key auth)
+  gemini:
+    enabled: false
+    # model: "gemini-2.5-flash"
+    # API key for Google Gemini
+  # Set via environment variable: BLACKCAT_PROVIDERS_GEMINI_APIKEY
+    # apiKey: ""
+
+  # Zen Coding Plan provider (requires zen.apiKey to be set)
+  zen:
+    enabled: false
+    # model: "opencode/claude-sonnet-4-6"
+
+
+# === Phase 3: Dashboard ===
+dashboard:
+  enabled: false          # Enable web dashboard (default: false)
+  addr: ":8081"           # Dashboard listen address (default: ":8081")
+  # token is auto-generated by `blackcat init` and stored in vault
+
+# === Phase 3: Scheduler ===
+scheduler:
+  enabled: false           # Enable cron scheduler (default: false)
+  jobs:
+    # - name: "memory-consolidate"
+    #   schedule: "0 * * * *"  # Every hour (cron format)
+    #   command: "memory-consolidate"
+    #   enabled: true
+
+# === Phase 3: Orchestrator ===
+orchestrator:
+  max_concurrent: 5        # Max concurrent sub-agents (hard cap: 10)
+  sub_agent_timeout: "5m" # Sub-agent timeout. Accepts Go duration strings ("5m", "300s") or integer seconds (300).
+
+# === Phase 3: Sessions ===
+session:
+  enabled: true            # Enable conversation history (default: true)
+  store_dir: ""            # Default: ~/.blackcat/sessions/
+  max_history: 50          # Max messages per session in LLM context (default: 50)
+
+# === Phase 3: Rules ===
+rules:
+  dir: ".blackcat/rules"  # Rules directory for conditional rule .md files
+
+# === Phase 3: Profiles ===
+profiles:
+  dir: ".blackcat/profiles"  # Profiles directory for custom agent profile .md files
+
+# Agent persona and personalization settings
+agent:
+  name: "BlackCat"           # Agent display name shown in persona system prompt
+  greeting: "Halo! Saya BlackCat, asisten AI Anda. Ada yang bisa saya bantu?"
+  # Acknowledgment message sent immediately before processing each request
+  ackMessage: "Baik, saya cek dulu..."
+  language: "id"                  # Response language hint: "id" (Indonesian) or "en" (English)
+  tone: "friendly"                # Communication tone: "friendly", "professional", "casual"
