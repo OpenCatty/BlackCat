@@ -500,6 +500,9 @@ func saveProviderYAML(name, endpoint, model string) error {
 		}
 	}
 
+	if err := config.Save(configPath, cfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
 	fmt.Printf("Provider '%s' configured (model: %s)\n", name, model)
 	return nil
 }

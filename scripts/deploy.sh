@@ -2,9 +2,12 @@
 set -euo pipefail
 
 # ============================================================================
-# BlackCat Deploy Script
-# Builds on VM, installs binary, deploys systemd services, verifies health.
+# BlackCat Deploy Script (user-space, non-root)
+# Builds on VM, installs binary, deploys systemd user services, verifies health.
 # Usage: bash scripts/deploy.sh [--no-push]
+#
+# Prerequisites (one-time, requires sudo):
+#   sudo loginctl enable-linger $USER
 # ============================================================================
 
 # --- Colors & helpers -------------------------------------------------------
@@ -100,20 +103,18 @@ ok "Code updated on VM"
 # ============================================================================
 info "Step 4: Building binary on VM..."
 
-$SSH_CMD "cd $DEPLOY_WORKDIR && CGO_ENABLED=1 /usr/local/go/bin/go build -tags fts5 -o blackcat ."
+$SSH_CMD "cd $DEPLOY_WORKDIR && mkdir -p \$(dirname $BLACKCAT_BINARY) && CGO_ENABLED=1 /usr/local/go/bin/go build -tags fts5 -o $BLACKCAT_BINARY ."
 
-ok "Binary built successfully"
+ok "Binary built to $BLACKCAT_BINARY"
 
 # ============================================================================
-# Step 5: Install binary
+# Step 5: Stop running services
 # ============================================================================
-info "Step 5: Installing binary to $BLACKCAT_BINARY..."
+info "Step 5: Stopping services..."
 
-# Stop services first so the binary is not locked ("text file busy")
-$SSH_CMD "sudo systemctl stop blackcat opencode 2>/dev/null || true; sleep 1"
-$SSH_CMD "sudo cp $DEPLOY_WORKDIR/blackcat $BLACKCAT_BINARY"
+$SSH_CMD "systemctl --user stop blackcat opencode 2>/dev/null || true; sleep 1"
 
-ok "Binary installed"
+ok "Services stopped"
 
 # ============================================================================
 # Step 6: Upload service files
@@ -133,16 +134,12 @@ info "Step 7: Substituting placeholders in service files..."
 
 $SSH_CMD << EOF
   # blackcat.service placeholders
-  sed -i "s|__DEPLOY_USER__|$DEPLOY_USER|g" /tmp/blackcat.service
-  sed -i "s|__DEPLOY_GROUP__|$DEPLOY_USER|g" /tmp/blackcat.service
   sed -i "s|__DEPLOY_HOME__|$DEPLOY_HOME|g" /tmp/blackcat.service
   sed -i "s|__BLACKCAT_BINARY__|$BLACKCAT_BINARY|g" /tmp/blackcat.service
   sed -i "s|__DEPLOY_CONFIG_PATH__|$DEPLOY_CONFIG_PATH|g" /tmp/blackcat.service
   sed -i "s|__VAULT_PASSPHRASE__|$VAULT_PASSPHRASE|g" /tmp/blackcat.service
 
   # opencode.service placeholders
-  sed -i "s|__DEPLOY_USER__|$DEPLOY_USER|g" /tmp/opencode.service
-  sed -i "s|__DEPLOY_GROUP__|$DEPLOY_USER|g" /tmp/opencode.service
   sed -i "s|__DEPLOY_HOME__|$DEPLOY_HOME|g" /tmp/opencode.service
   sed -i "s|__BLACKCAT_BINARY__|$BLACKCAT_BINARY|g" /tmp/opencode.service
   sed -i "s|__OPENCODE_PORT__|$OPENCODE_PORT|g" /tmp/opencode.service
@@ -152,13 +149,14 @@ EOF
 ok "Placeholders substituted"
 
 # ============================================================================
-# Step 8: Install service files
+# Step 8: Install service files to user systemd directory
 # ============================================================================
-info "Step 8: Installing service files to /etc/systemd/system/..."
+info "Step 8: Installing service files to ~/.config/systemd/user/..."
 
 $SSH_CMD << 'INSTALL_EOF'
-  sudo cp /tmp/blackcat.service /etc/systemd/system/blackcat.service
-  sudo cp /tmp/opencode.service /etc/systemd/system/opencode.service
+  mkdir -p ~/.config/systemd/user
+  cp /tmp/blackcat.service ~/.config/systemd/user/blackcat.service
+  cp /tmp/opencode.service ~/.config/systemd/user/opencode.service
   rm -f /tmp/blackcat.service /tmp/opencode.service
 INSTALL_EOF
 
@@ -169,14 +167,27 @@ ok "Service files installed"
 # ============================================================================
 info "Step 9: Reloading systemd and restarting services..."
 
-$SSH_CMD "sudo systemctl daemon-reload && sudo systemctl restart opencode blackcat"
+$SSH_CMD "systemctl --user daemon-reload && systemctl --user restart opencode blackcat"
 
 ok "Services restarted"
 
 # ============================================================================
-# Step 10: Verify health
+# Step 10: Check linger status
 # ============================================================================
-info "Step 10: Verifying health..."
+info "Step 10: Checking linger status..."
+
+LINGER_STATUS=$($SSH_CMD "loginctl show-user $DEPLOY_USER -p Linger 2>/dev/null || echo 'Linger=unknown'")
+if [[ "$LINGER_STATUS" == *"Linger=yes"* ]]; then
+  ok "Linger is enabled for $DEPLOY_USER"
+else
+  warn "Linger is NOT enabled. User services will stop when you log out!"
+  warn "Run this once on the VM:  sudo loginctl enable-linger $DEPLOY_USER"
+fi
+
+# ============================================================================
+# Step 11: Verify health
+# ============================================================================
+info "Step 11: Verifying health..."
 
 HEALTH_URL="http://$DEPLOY_HOST:8080/health"
 HEALTH_OK=false
@@ -201,5 +212,5 @@ echo ""
 ok "Deploy complete! 🚀"
 echo -e "  ${CYAN}Host:${NC}     $DEPLOY_HOST"
 echo -e "  ${CYAN}Binary:${NC}   $BLACKCAT_BINARY"
-echo -e "  ${CYAN}Services:${NC} blackcat, opencode"
+echo -e "  ${CYAN}Services:${NC} blackcat, opencode (user-level)"
 echo -e "  ${CYAN}Health:${NC}   $HEALTH_URL"

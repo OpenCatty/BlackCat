@@ -100,7 +100,7 @@ func TestListTemplates(t *testing.T) {
 	}
 
 	// Check for expected templates
-	expectedCount := 5 // AGENTS.md, SOUL.md, MEMORY.md, skills/coding.md, skills/research.md
+	expectedCount := 6 // AGENTS.md, SOUL.md, MEMORY.md, skills/coding.md, skills/research.md
 	if len(templates) != expectedCount {
 		t.Errorf("expected %d templates, got %d", expectedCount, len(templates))
 	}
@@ -118,6 +118,7 @@ func TestListTemplates(t *testing.T) {
 		"MEMORY.md",
 		"skills/coding.md",
 		"skills/research.md",
+		"skills/self-management.md",
 	}
 
 	for _, exp := range expected {

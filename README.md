@@ -33,65 +33,38 @@ BlackCat receives your natural language requests, processes them through an LLM-
 
 ## Quick Start
 
-### 1. Install
+### Install
 
+**Linux/macOS** (one-line):
+```bash
+curl -fsSL https://raw.githubusercontent.com/startower-observability/BlackCat/main/scripts/install.sh | sh
+```
+
+**Windows** (PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/startower-observability/BlackCat/main/scripts/install.ps1 | iex
+```
+
+**Or with Go:**
 ```bash
 go install github.com/startower-observability/blackcat@latest
 ```
 
-Or build from source:
-
+### Onboard
 ```bash
-git clone https://github.com/startower-observability/blackcat.git
-cd blackcat
-go build -o blackcat .
+blackcat onboard
 ```
 
-### 2. Initialize
+The wizard guides you through:
+1. Choosing an LLM provider
+2. Configuring a messaging channel
+3. Installing and starting the daemon
 
+### Manage the daemon
 ```bash
-blackcat init
-```
-
-### 3. Configure a Provider
-
-Interactive wizard:
-
-```bash
-blackcat configure
-```
-
-Or non-interactive:
-
-```bash
-blackcat configure --provider openai --api-key sk-your-key --model gpt-4o
-```
-
-For GitHub Copilot (uses your existing subscription):
-
-```bash
-blackcat configure --provider copilot
-```
-
-### 4. Enable a Channel
-
-Edit `~/.blackcat/config.yaml`:
-
-```yaml
-channels:
-  telegram:
-    enabled: true
-    token: "your-bot-token"
-```
-
-### 5. Start
-
-```bash
-# Ensure OpenCode CLI is running
-opencode
-
-# Start BlackCat
-blackcat daemon
+blackcat status     # check status
+blackcat restart    # restart after config changes
+blackcat stop       # stop the daemon
 ```
 
 ## Deployment
@@ -139,13 +112,11 @@ See [`deploy/README.md`](deploy/README.md) for full setup instructions including
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](docs/getting-started.md) | Prerequisites, installation, quick start |
-| [Configuration](docs/configuration.md) | Full YAML reference, environment variables, examples |
-| [LLM Providers](docs/providers.md) | All 8 providers: setup, models, configuration |
-| [OAuth Setup](docs/oauth.md) | Copilot device flow and Antigravity PKCE walkthrough |
-| [Zen Coding Plan](docs/zen-plan.md) | Curated hosted models, setup, billing |
-| [CLI Configure](docs/configure-cli.md) | Interactive wizard and flag-mode reference |
-| [Architecture](docs/architecture.md) | How BlackCat works internally |
+| [Getting Started](https://startower-observability.github.io/BlackCat/getting-started) | Prerequisites, installation, quick start |
+| [Configuration](https://startower-observability.github.io/BlackCat/configuration) | Full YAML reference, environment variables, examples |
+| [LLM Providers](https://startower-observability.github.io/BlackCat/providers) | All 8 providers: setup, models, configuration |
+| [CLI Reference](https://startower-observability.github.io/BlackCat/cli/onboard) | Reference for all BlackCat commands |
+| [Architecture](https://startower-observability.github.io/BlackCat/concepts/architecture) | How BlackCat works internally |
 
 ## Configuration
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -388,4 +389,18 @@ func discoverConfigPath() (string, bool) {
 	}
 
 	return "", false
+}
+
+// Save writes cfg to the provided YAML file path.
+// It creates the parent directory (mode 0700) if it does not exist,
+// then writes the marshalled YAML with mode 0600.
+func Save(path string, cfg *Config) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return fmt.Errorf("config: create directory: %w", err)
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("config: marshal: %w", err)
+	}
+	return os.WriteFile(path, data, 0o600)
 }

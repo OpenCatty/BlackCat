@@ -1,18 +1,13 @@
 [Unit]
 Description=OpenCode Server (managed by BlackCat)
-After=network.target
+After=network-online.target
 
 [Service]
 Type=simple
-User=__DEPLOY_USER__
-Group=__DEPLOY_GROUP__
-WorkingDirectory=__DEPLOY_HOME__/blackcat
 ExecStart=__BLACKCAT_BINARY__ serve --port __OPENCODE_PORT__ --binary __OPENCODE_BINARY__
-Restart=always
+WorkingDirectory=__DEPLOY_HOME__
+Restart=on-failure
 RestartSec=5
-Environment=PATH=/usr/local/bin:/usr/local/go/bin:__DEPLOY_HOME__/.opencode/bin:__DEPLOY_HOME__/go/bin:/usr/bin:/bin
-Environment=HOME=__DEPLOY_HOME__
-Environment=XDG_CONFIG_HOME=__DEPLOY_HOME__/.config
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
