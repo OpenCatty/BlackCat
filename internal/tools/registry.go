@@ -4,6 +4,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/startower-observability/blackcat/internal/memory"
@@ -56,12 +57,43 @@ func (r *Registry) List() []types.ToolDefinition {
 	return defs
 }
 
-// Execute finds a tool by name and runs it with the given arguments.
+// ValidationError is returned when tool arguments fail schema validation.
+type ValidationError struct {
+	ToolName string
+	Details  string
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("tool %q argument validation failed: %s", e.ToolName, e.Details)
+}
+
+// Execute finds a tool by name, validates args against the tool's schema, and runs it.
 func (r *Registry) Execute(ctx context.Context, name string, args json.RawMessage) (string, error) {
 	t, err := r.Get(name)
 	if err != nil {
 		return "", err
 	}
+
+	// Validate args against the tool's JSON Schema (required-field check only).
+	params := t.Parameters()
+	if len(params) > 0 && string(params) != "null" && string(params) != "{}" {
+		var argsMap map[string]any
+		if err := json.Unmarshal(args, &argsMap); err != nil {
+			return "", &ValidationError{ToolName: name, Details: fmt.Sprintf("args is not valid JSON: %v", err)}
+		}
+
+		var schema struct {
+			Required []string `json:"required"`
+		}
+		if err := json.Unmarshal(params, &schema); err == nil {
+			for _, field := range schema.Required {
+				if _, ok := argsMap[field]; !ok {
+					return "", &ValidationError{ToolName: name, Details: fmt.Sprintf("missing required field: %s", field)}
+				}
+			}
+		}
+	}
+
 	return t.Execute(ctx, args)
 }
 

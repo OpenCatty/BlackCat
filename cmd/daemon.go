@@ -27,6 +27,7 @@ import (
 	"github.com/startower-observability/blackcat/internal/hooks"
 	"github.com/startower-observability/blackcat/internal/ratelimit"
 	"github.com/startower-observability/blackcat/internal/rules"
+	guardrailsPkg "github.com/startower-observability/blackcat/internal/guardrails"
 	"github.com/startower-observability/blackcat/internal/llm"
 	"github.com/startower-observability/blackcat/internal/llm/antigravity"
 	"github.com/startower-observability/blackcat/internal/llm/copilot"
@@ -102,6 +103,21 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 	if len(cfg.Security.DenyPatterns) > 0 {
 		slog.Info("security deny patterns loaded", "count", len(cfg.Security.DenyPatterns))
 	}
+
+	// Build guardrails pipeline from config
+	guardrailsCfg := guardrailsPkg.GuardrailsConfig{
+		InputEnabled:            cfg.Security.Guardrails.Input.Enabled,
+		ToolEnabled:             cfg.Security.Guardrails.Tool.Enabled,
+		OutputEnabled:           cfg.Security.Guardrails.Output.Enabled,
+		CustomInputPatterns:     cfg.Security.Guardrails.Input.CustomPatterns,
+		RequireApprovalPatterns: cfg.Security.Guardrails.Tool.RequireApprovalPatterns,
+	}
+	guardrailsPipeline := guardrailsPkg.NewPipeline(guardrailsCfg)
+	slog.Info("guardrails pipeline initialized",
+		"input_enabled", guardrailsCfg.InputEnabled,
+		"tool_enabled", guardrailsCfg.ToolEnabled,
+		"output_enabled", guardrailsCfg.OutputEnabled,
+	)
 
 	fileMemStore := memory.NewFileStore(cfg.Memory.FilePath)
 	var memStore memory.Store = fileMemStore
@@ -315,6 +331,7 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 		MaxContextTokens: cfg.LLM.MaxContextTokens,
 		MemoryFileStore:  fileMemStore,
 		CoreStore:        coreStore,
+		Guardrails:       guardrailsPipeline,
 	}
 
 	bus := channel.NewMessageBus(256)

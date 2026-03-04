@@ -3,16 +3,19 @@ package agent
 import "github.com/startower-observability/blackcat/internal/types"
 
 type Execution struct {
-	Messages     []types.LLMMessage
-	ToolOutputs  map[string]string
-	ToolMappings map[string]types.Tool
-	TotalUsage   types.LLMUsage
-	Compacted    bool
-	Done         bool
-	TurnCount    int
-	MaxTurns     int
-	Response     string
-	Error        error
+	Messages        []types.LLMMessage
+	ToolOutputs     map[string]string
+	ToolMappings    map[string]types.Tool
+	PendingApproval *PendingApproval
+	TotalUsage      types.LLMUsage
+	Compacted       bool
+	NextStep        NextStep
+	Done            bool
+	TurnCount       int
+	MaxTurns        int
+	Response        string
+	Error           error
+	ToolRetryCount  map[string]int
 }
 
 func NewExecution(maxTurns int) *Execution {
@@ -23,8 +26,9 @@ func NewExecution(maxTurns int) *Execution {
 	return &Execution{
 		Messages:     make([]types.LLMMessage, 0, 8),
 		ToolOutputs:  make(map[string]string),
-		ToolMappings: make(map[string]types.Tool),
-		MaxTurns:     maxTurns,
+		ToolMappings:   make(map[string]types.Tool),
+		ToolRetryCount: make(map[string]int),
+		MaxTurns:       maxTurns,
 	}
 }
 

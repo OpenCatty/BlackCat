@@ -80,9 +80,11 @@ type WhatsAppConfig struct {
 
 // SecurityConfig holds security-related settings.
 type SecurityConfig struct {
-	VaultPath    string   `yaml:"vaultPath"`    // e.g., "~/.blackcat/vault.json"
-	DenyPatterns []string `yaml:"denyPatterns"` // Patterns to deny
-	AutoPermit   bool     `yaml:"autoPermit"`   // Auto-permit requests
+	VaultPath    string           `yaml:"vaultPath"`    // e.g., "~/.blackcat/vault.json"
+	DenyPatterns []string         `yaml:"denyPatterns"` // Patterns to deny
+	AutoPermit   bool             `yaml:"autoPermit"`   // Auto-permit requests
+	Guardrails   GuardrailsConfig `yaml:"guardrails"`
+	HITL         HITLConfig       `yaml:"hitl"`
 }
 
 // MemoryConfig holds memory consolidation settings.
@@ -108,6 +110,36 @@ type EmbeddingConfig struct {
 type CoreMemoryConfig struct {
 	MaxEntries  int `yaml:"maxEntries"`  // default 20
 	MaxValueLen int `yaml:"maxValueLen"` // default 500
+}
+
+// InputGuardrailConfig holds settings for the input guardrail.
+type InputGuardrailConfig struct {
+	Enabled        bool     `yaml:"enabled"`
+	CustomPatterns []string `yaml:"customPatterns"`
+}
+
+// ToolGuardrailConfig holds settings for the tool guardrail.
+type ToolGuardrailConfig struct {
+	Enabled                 bool     `yaml:"enabled"`
+	RequireApprovalPatterns []string `yaml:"requireApproval"`
+}
+
+// OutputGuardrailConfig holds settings for the output guardrail.
+type OutputGuardrailConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+// GuardrailsConfig holds the full guardrails pipeline configuration.
+type GuardrailsConfig struct {
+	Input  InputGuardrailConfig  `yaml:"input"`
+	Tool   ToolGuardrailConfig   `yaml:"tool"`
+	Output OutputGuardrailConfig `yaml:"output"`
+}
+
+// HITLConfig holds human-in-the-loop approval settings.
+type HITLConfig struct {
+	Enabled        bool `yaml:"enabled"`
+	TimeoutMinutes int  `yaml:"timeoutMinutes"`
 }
 
 // MCPConfig holds MCP server configurations.
@@ -311,5 +343,20 @@ func (c *Config) Validate() {
 	}
 	if c.Memory.Embedding.Model == "" {
 		c.Memory.Embedding.Model = "text-embedding-3-small"
+	}
+
+	// Guardrails defaults — enabled by default for safety
+	if !c.Security.Guardrails.Input.Enabled && len(c.Security.Guardrails.Input.CustomPatterns) == 0 {
+		c.Security.Guardrails.Input.Enabled = true
+	}
+	if !c.Security.Guardrails.Tool.Enabled && len(c.Security.Guardrails.Tool.RequireApprovalPatterns) == 0 {
+		c.Security.Guardrails.Tool.Enabled = true
+	}
+	if !c.Security.Guardrails.Output.Enabled {
+		c.Security.Guardrails.Output.Enabled = true
+	}
+	// HITL defaults
+	if c.Security.HITL.TimeoutMinutes == 0 {
+		c.Security.HITL.TimeoutMinutes = 5
 	}
 }

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	guardrailsPkg "github.com/startower-observability/blackcat/internal/guardrails"
 	"github.com/startower-observability/blackcat/internal/hooks"
 	"github.com/startower-observability/blackcat/internal/llm"
 	"github.com/startower-observability/blackcat/internal/memory"
@@ -40,8 +42,10 @@ type Loop struct {
 	modelName          string
 	providerName       string
 	channelType        string
-	userID    string
-	coreStore *memory.CoreStore
+	userID             string
+	coreStore          *memory.CoreStore
+	guardrails         *guardrailsPkg.Pipeline
+	interruptMgr       *InterruptManager
 }
 
 type LoopConfig struct {
@@ -63,8 +67,9 @@ type LoopConfig struct {
 	ModelName          string
 	ProviderName       string
 	ChannelType        string
-	UserID    string
-	CoreStore *memory.CoreStore
+	UserID             string
+	CoreStore          *memory.CoreStore
+	Guardrails         *guardrailsPkg.Pipeline
 }
 
 func NewLoop(cfg LoopConfig) *Loop {
@@ -127,8 +132,10 @@ func NewLoop(cfg LoopConfig) *Loop {
 		modelName:          cfg.ModelName,
 		providerName:       cfg.ProviderName,
 		channelType:        cfg.ChannelType,
-		userID:    cfg.UserID,
-		coreStore: cfg.CoreStore,
+		userID:             cfg.UserID,
+		coreStore:          cfg.CoreStore,
+		guardrails:         cfg.Guardrails,
+		interruptMgr:       NewInterruptManager(),
 	}
 }
 
@@ -138,6 +145,7 @@ func (l *Loop) Run(ctx context.Context, userMessage string) (*Execution, error) 
 	systemPrompt, err := l.buildSystemPrompt(ctx)
 	if err != nil {
 		execution.Error = err
+		execution.NextStep = Error
 		return execution, err
 	}
 
@@ -166,76 +174,128 @@ func (l *Loop) Run(ctx context.Context, userMessage string) (*Execution, error) 
 	toolDefs := l.tools.List()
 
 	for {
-		if l.hooks != nil {
-			if err := l.fireHook(ctx, hooks.PreChat, &hooks.HookContext{Metadata: map[string]any{"messages": execution.Messages}}); err != nil {
-				execution.Error = err
-				return execution, err
-			}
-		}
+		step := l.processOneTurn(ctx, execution, toolDefs)
+		execution.NextStep = step
 
-		resp, err := llm.RetryChat(ctx, l.llm, execution.Messages, toolDefs, 3)
-		if err != nil {
-			execution.Error = err
-			return execution, err
-		}
-
-		if l.hooks != nil {
-			if err := l.fireHook(ctx, hooks.PostChat, &hooks.HookContext{LLMResponse: resp}); err != nil {
-				execution.Error = err
-				return execution, err
-			}
-		}
-
-		execution.TotalUsage.PromptTokens += resp.Usage.PromptTokens
-		execution.TotalUsage.CompletionTokens += resp.Usage.CompletionTokens
-		execution.TotalUsage.TotalTokens += resp.Usage.TotalTokens
-
-		execution.TurnCount++
-
-		if len(resp.ToolCalls) == 0 {
-			execution.AddAssistantMessage(resp.Content, nil)
-			execution.Response = resp.Content
-			execution.Done = true
+		switch step {
+		case RunAgain:
+			continue
+		case FinalOutput, Interrupted, Handoff:
 			return execution, nil
-		}
-
-		execution.AddAssistantMessage(resp.Content, resp.ToolCalls)
-
-		for _, call := range resp.ToolCalls {
-			if l.hooks != nil {
-				hctx := &hooks.HookContext{ToolName: call.Name, Metadata: map[string]any{"args": call.Arguments}}
-				if err := l.fireHook(ctx, hooks.PreToolExec, hctx); err != nil {
-					continue
-				}
-			}
-
-			toolResult, err := l.tools.Execute(ctx, call.Name, call.Arguments)
-			if err != nil {
-				slog.Warn("tool execution error, feeding back to LLM", "tool", call.Name, "err", err)
-				toolResult = fmt.Sprintf("Tool error: %s", err.Error())
-			}
-
-			if l.hooks != nil {
-				hctx := &hooks.HookContext{ToolName: call.Name, Metadata: map[string]any{"args": call.Arguments, "result": toolResult}}
-				if err := l.fireHook(ctx, hooks.PostToolExec, hctx); err != nil {
-					execution.Error = err
-					return execution, err
-				}
-			}
-
-			scrubbedResult := l.scrubber.Scrub(toolResult)
-			execution.AddToolResult(call.ID, call.Name, scrubbedResult)
-
-			if tool, getErr := l.tools.Get(call.Name); getErr == nil {
-				execution.ToolMappings[call.ID] = tool
-			}
-		}
-
-		if execution.TurnCount >= execution.MaxTurns {
-			execution.Error = types.ErrMaxTurnsExceeded
-			return execution, types.ErrMaxTurnsExceeded
+		case Error:
+			return execution, execution.Error
+		default:
+			execution.Error = fmt.Errorf("unknown next step: %d", step)
+			execution.NextStep = Error
+			return execution, execution.Error
 		}
 	}
+}
+
+func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDefs []types.ToolDefinition) NextStep {
+	if l.hooks != nil {
+		if err := l.fireHook(ctx, hooks.PreChat, &hooks.HookContext{Metadata: map[string]any{"messages": execution.Messages}}); err != nil {
+			execution.Error = err
+			return Error
+		}
+	}
+
+	if false {
+		return Interrupted
+	}
+
+	if false {
+		return Handoff
+	}
+
+	resp, err := llm.RetryChat(ctx, l.llm, execution.Messages, toolDefs, 3)
+	if err != nil {
+		execution.Error = err
+		return Error
+	}
+
+	if l.hooks != nil {
+		if err := l.fireHook(ctx, hooks.PostChat, &hooks.HookContext{LLMResponse: resp}); err != nil {
+			execution.Error = err
+			return Error
+		}
+	}
+
+	execution.TotalUsage.PromptTokens += resp.Usage.PromptTokens
+	execution.TotalUsage.CompletionTokens += resp.Usage.CompletionTokens
+	execution.TotalUsage.TotalTokens += resp.Usage.TotalTokens
+
+	execution.TurnCount++
+
+	if len(resp.ToolCalls) == 0 {
+		execution.AddAssistantMessage(resp.Content, nil)
+		execution.Response = resp.Content
+		execution.Done = true
+		return FinalOutput
+	}
+
+	execution.AddAssistantMessage(resp.Content, resp.ToolCalls)
+
+	for _, call := range resp.ToolCalls {
+		if l.hooks != nil {
+			hctx := &hooks.HookContext{ToolName: call.Name, Metadata: map[string]any{"args": call.Arguments}}
+			if err := l.fireHook(ctx, hooks.PreToolExec, hctx); err != nil {
+				continue
+			}
+		}
+
+		if l.guardrails != nil {
+			result := l.guardrails.CheckTool(call.Name, string(call.Arguments))
+			if !result.Allow {
+				if l.interruptMgr == nil {
+					l.interruptMgr = NewInterruptManager()
+				}
+				pa := l.interruptMgr.CreateApproval(l.userID, call.Name, string(call.Arguments), result.Reason, defaultApprovalTimeout)
+				execution.PendingApproval = pa
+				return Interrupted
+			}
+		}
+
+		toolResult, err := l.tools.Execute(ctx, call.Name, call.Arguments)
+		if err != nil {
+			var valErr *tools.ValidationError
+			if errors.As(err, &valErr) {
+				execution.ToolRetryCount[call.ID]++
+				if execution.ToolRetryCount[call.ID] < 2 {
+					errorMsg := fmt.Sprintf("Validation error: %s. Please fix your arguments and try again.", valErr.Error())
+					scrubbedMsg := l.scrubber.Scrub(errorMsg)
+					execution.AddToolResult(call.ID, call.Name, scrubbedMsg)
+					return RunAgain
+				}
+				execution.Error = fmt.Errorf("tool %q exceeded max retries: %w", call.Name, valErr)
+				return Error
+			}
+			slog.Warn("tool execution error, feeding back to LLM", "tool", call.Name, "err", err)
+			toolResult = fmt.Sprintf("Tool error: %s", err.Error())
+		}
+
+		if l.hooks != nil {
+			hctx := &hooks.HookContext{ToolName: call.Name, Metadata: map[string]any{"args": call.Arguments, "result": toolResult}}
+			if err := l.fireHook(ctx, hooks.PostToolExec, hctx); err != nil {
+				execution.Error = err
+				return Error
+			}
+		}
+
+		scrubbedResult := l.scrubber.Scrub(toolResult)
+		execution.AddToolResult(call.ID, call.Name, scrubbedResult)
+
+		if tool, getErr := l.tools.Get(call.Name); getErr == nil {
+			execution.ToolMappings[call.ID] = tool
+		}
+	}
+
+	if execution.TurnCount >= execution.MaxTurns {
+		execution.Error = types.ErrMaxTurnsExceeded
+		return Error
+	}
+
+	return RunAgain
 }
 
 func (l *Loop) addSessionHistory(execution *Execution) {
