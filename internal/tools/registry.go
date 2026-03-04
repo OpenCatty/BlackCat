@@ -110,3 +110,35 @@ func RegisterMemoryTools(r *Registry, core *memory.CoreStore, archival *memory.S
 		h.RegisterTools(r)
 	}
 }
+
+// Filter returns a new Registry containing only the tools with names in allowedTools.
+// If allowedTools is nil or empty, returns a copy of the entire registry.
+// The original registry is not mutated.
+func (r *Registry) Filter(allowedTools []string) *Registry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	
+	newRegistry := NewRegistry()
+	
+	// If no filter criteria, return a full copy
+	if len(allowedTools) == 0 {
+		for name, tool := range r.tools {
+			newRegistry.tools[name] = tool
+		}
+		return newRegistry
+	}
+	
+	// Copy only allowed tools
+	allowedSet := make(map[string]bool, len(allowedTools))
+	for _, name := range allowedTools {
+		allowedSet[name] = true
+	}
+	
+	for name, tool := range r.tools {
+		if allowedSet[name] {
+			newRegistry.tools[name] = tool
+		}
+	}
+	
+	return newRegistry
+}

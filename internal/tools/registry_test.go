@@ -138,3 +138,102 @@ func TestExecute_ToolNotFound(t *testing.T) {
 		t.Fatal("expected error for nonexistent tool, got nil")
 	}
 }
+
+func TestFilter_SubsetKeepsOnlyAllowedTools(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&filterMockTool{name: "tool_a"})
+	r.Register(&filterMockTool{name: "tool_b"})
+	r.Register(&filterMockTool{name: "tool_c"})
+	
+	filtered := r.Filter([]string{"tool_a", "tool_c"})
+	
+	_, err1 := filtered.Get("tool_a")
+	if err1 != nil {
+		t.Errorf("expected tool_a to be in filtered registry, got error: %v", err1)
+	}
+	
+	_, err2 := filtered.Get("tool_b")
+	if err2 == nil {
+		t.Error("expected tool_b to NOT be in filtered registry")
+	}
+	
+	_, err3 := filtered.Get("tool_c")
+	if err3 != nil {
+		t.Errorf("expected tool_c to be in filtered registry, got error: %v", err3)
+	}
+	
+	// Verify original registry is unchanged
+	_, origErr := r.Get("tool_b")
+	if origErr != nil {
+		t.Error("original registry should still contain tool_b")
+	}
+}
+	
+func TestFilter_NilAllowedToolsReturnsFullCopy(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&filterMockTool{name: "tool_a"})
+	r.Register(&filterMockTool{name: "tool_b"})
+	
+	filtered := r.Filter(nil)
+	
+	_, err1 := filtered.Get("tool_a")
+	if err1 != nil {
+		t.Errorf("expected tool_a in full copy, got error: %v", err1)
+	}
+	
+	_, err2 := filtered.Get("tool_b")
+	if err2 != nil {
+		t.Errorf("expected tool_b in full copy, got error: %v", err2)
+	}
+}
+	
+func TestFilter_EmptyAllowedToolsReturnsFullCopy(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&filterMockTool{name: "tool_x"})
+	r.Register(&filterMockTool{name: "tool_y"})
+	
+	filtered := r.Filter([]string{})
+	
+	_, err1 := filtered.Get("tool_x")
+	if err1 != nil {
+		t.Errorf("expected tool_x in full copy, got error: %v", err1)
+	}
+	
+	_, err2 := filtered.Get("tool_y")
+	if err2 != nil {
+		t.Errorf("expected tool_y in full copy, got error: %v", err2)
+	}
+}
+	
+func TestFilter_DoesNotMutateOriginal(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&filterMockTool{name: "tool_a"})
+	r.Register(&filterMockTool{name: "tool_b"})
+	
+	filtered := r.Filter([]string{"tool_a"})
+	
+	// Original should still have both tools
+	_, errOrig1 := r.Get("tool_a")
+	_, errOrig2 := r.Get("tool_b")
+	if errOrig1 != nil || errOrig2 != nil {
+		t.Error("original registry was mutated")
+	}
+	
+	// Filtered should only have tool_a
+	_, errFilt := filtered.Get("tool_a")
+	if errFilt != nil {
+		t.Error("filtered registry missing tool_a")
+	}
+}
+	
+// filterMockTool is a mock Tool implementation for Filter tests
+type filterMockTool struct {
+	name string
+}
+	
+func (m *filterMockTool) Name() string                { return m.name }
+func (m *filterMockTool) Description() string         { return "filter test tool" }
+func (m *filterMockTool) Parameters() json.RawMessage { return json.RawMessage(`{}`) }
+func (m *filterMockTool) Execute(_ context.Context, _ json.RawMessage) (string, error) {
+	return "ok", nil
+}

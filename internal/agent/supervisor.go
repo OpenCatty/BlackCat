@@ -85,12 +85,9 @@ func (s *Supervisor) RouteWithCfg(ctx context.Context, msg string, cfg LoopConfi
 	}
 
 	// Tool filtering: if AllowedTools is specified, filter the registry.
-	// TODO: Registry.Filter() does not exist yet — use full registry for now.
-	// When Filter is implemented, replace this block with:
-	//   if subCfg.AllowedTools != nil && cfg.Tools != nil {
-	//       cfg.Tools = cfg.Tools.Filter(subCfg.AllowedTools)
-	//   }
-	_ = subCfg.AllowedTools // acknowledge the field; filtering deferred
+	if subCfg.AllowedTools != nil && cfg.Tools != nil {
+		cfg.Tools = cfg.Tools.Filter(subCfg.AllowedTools)
+	}
 
 	return NewLoop(cfg).Run(ctx, msg)
 }
