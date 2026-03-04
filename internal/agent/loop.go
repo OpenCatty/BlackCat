@@ -50,6 +50,9 @@ type Loop struct {
 	eventStream        chan<- AgentEvent
 	traceID        string
 	costTracker    *observability.CostTracker
+	reflector      *Reflector
+	prefMgr        *PreferenceManager
+	planner        *Planner
 }
 
 type LoopConfig struct {
@@ -76,6 +79,9 @@ type LoopConfig struct {
 	Guardrails         *guardrailsPkg.Pipeline
 	EventStream    chan<- AgentEvent
 	CostTracker    *observability.CostTracker // optional, nil skips recording
+	Reflector      *Reflector      // optional, nil disables self-reflection
+	PrefManager    *PreferenceManager // optional, nil disables adaptive preferences
+	Planner        *Planner           // optional, nil disables plan-and-execute
 }
 
 func NewLoop(cfg LoopConfig) *Loop {
@@ -144,6 +150,9 @@ func NewLoop(cfg LoopConfig) *Loop {
 		interruptMgr:       NewInterruptManager(),
 		eventStream:        cfg.EventStream,
 		costTracker:        cfg.CostTracker,
+		reflector:          cfg.Reflector,
+		prefMgr:            cfg.PrefManager,
+		planner:            cfg.Planner,
 	}
 }
 
@@ -160,6 +169,30 @@ func (l *Loop) Run(ctx context.Context, userMessage string) (*Execution, error) 
 
 	execution.AddSystemMessage(systemPrompt)
 	l.addSessionHistory(execution)
+
+	// Plan-and-execute: for complex tasks, generate a structured plan and store
+	// it on the execution. A plan summary is injected as a system message for the
+	// LLM to follow step-by-step.
+	if l.planner != nil && IsComplexTask(userMessage) {
+		toolDefs := l.tools.List()
+		plan, planErr := l.planner.GeneratePlan(ctx, userMessage, toolDefs)
+		if planErr != nil {
+			slog.Warn("plan generation failed, proceeding without plan", "err", planErr)
+		} else if plan != nil {
+			execution.Plan = plan
+			l.emit(l.eventStream, AgentEvent{Kind: EventThinking, Message: "Generated execution plan: " + plan.Goal})
+			planCtx := fmt.Sprintf("# Execution Plan\n%s\n\nFollow this plan step-by-step. Report progress after each step.", plan.Summary())
+			execution.Messages = append(execution.Messages, types.LLMMessage{Role: "system", Content: planCtx})
+		}
+	}
+
+	// Clarification: if the request is ambiguous, inject guidance asking the
+	// agent to ask clarifying questions instead of acting blindly.
+	if clarSection := ClarificationPromptSection(userMessage); clarSection != "" {
+		execution.Messages = append(execution.Messages, types.LLMMessage{Role: "system", Content: clarSection})
+		l.emit(l.eventStream, AgentEvent{Kind: EventThinking, Message: "Request appears ambiguous, will ask for clarification"})
+	}
+
 	execution.AddUserMessage(userMessage)
 
 	// Proactive compaction: if messages approach context limit, compact first
@@ -315,6 +348,16 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 			}
 			slog.Warn("tool execution error, feeding back to LLM", "tool", call.Name, "err", err)
 			toolResult = fmt.Sprintf("Tool error: %s", err.Error())
+			// Self-reflection: critique the failure and store lesson
+			if l.reflector != nil && execution.ReflectionCount < MaxReflections {
+				lesson, reflErr := l.reflector.Reflect(ctx, l.userID, call.Name, string(call.Arguments), toolResult)
+				if reflErr != nil {
+					slog.WarnContext(ctx, "self-reflection failed", "tool", call.Name, "err", reflErr)
+				} else if lesson != "" {
+					slog.InfoContext(ctx, "self-reflection lesson", "tool", call.Name, "lesson", lesson)
+				}
+				execution.ReflectionCount++
+			}
 		}
 
 		if l.hooks != nil {
@@ -473,6 +516,16 @@ func (l *Loop) buildSystemPrompt(ctx context.Context) (string, error) {
 			sections = append(sections, coreMemory)
 		}
 	}
+	// Adaptive user preferences — injected after core memory.
+	if l.prefMgr != nil {
+		profile := l.prefMgr.LoadPreferences(ctx, l.userID)
+		if prefBlock := FormatForPrompt(profile); prefBlock != "" {
+			sections = append(sections, prefBlock)
+		}
+	}
+
+	// Handling ambiguous requests — ask for clarification before executing.
+	sections = append(sections, "# Handling Ambiguous Requests\nIf a user's request is ambiguous, incomplete, or could be interpreted in multiple ways, ask ONE concise clarifying question before taking action. Do NOT ask multiple questions. Do NOT ask for clarification on clear, straightforward requests.")
 
 	// Final reinforcement — placed LAST for maximum LLM compliance.
 	sections = append(sections, "# CRITICAL REMINDER\nYour responses MUST be 1-3 sentences. No lists. No menus. No capability dumps. Just answer the question directly.")

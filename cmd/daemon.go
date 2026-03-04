@@ -346,7 +346,11 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 		CoreStore:        coreStore,
 		Guardrails:       guardrailsPipeline,
 		CostTracker:      costTracker,
+		Reflector:        agent.NewReflector(agentLLM, sqliteMemStore),
+		PrefManager:      agent.NewPreferenceManager(coreStore),
+		Planner:          agent.NewPlanner(agentLLM),
 	}
+	supervisor := agent.NewSupervisor(baseLoopCfg)
 
 	bus := channel.NewMessageBus(256)
 	var whatsAppChannel *whatsapp.WhatsAppChannel
@@ -590,7 +594,7 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 					}
 				}()
 
-				execution, runErr := agent.NewLoop(loopCfg).Run(ctx, m.Content)
+				execution, runErr := supervisor.RouteWithCfg(ctx, m.Content, loopCfg)
 				close(eventCh)
 				response := ""
 				if runErr != nil {
@@ -619,7 +623,7 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 						}
 						// Retry with trimmed context
 						loopCfg.EventStream = nil // eventCh is closed; disable streaming for retry
-						retryExecution, retryErr := agent.NewLoop(loopCfg).Run(ctx, m.Content)
+						retryExecution, retryErr := supervisor.RouteWithCfg(ctx, m.Content, loopCfg)
 						if retryErr != nil {
 							slog.Error("retry after compaction failed", "err", retryErr)
 							response = "Percakapan sangat panjang. Saya mulai sesi baru untuk Anda."

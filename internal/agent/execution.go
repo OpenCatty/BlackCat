@@ -16,6 +16,8 @@ type Execution struct {
 	Response        string
 	Error           error
 	ToolRetryCount  map[string]int
+	ReflectionCount int
+	Plan            *Plan // non-nil when plan-and-execute mode is active
 }
 
 func NewExecution(maxTurns int) *Execution {
