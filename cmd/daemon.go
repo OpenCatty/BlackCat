@@ -44,6 +44,7 @@ import (
 	"github.com/startower-observability/blackcat/internal/tools"
 	"github.com/startower-observability/blackcat/internal/types"
 	"github.com/startower-observability/blackcat/internal/workspace"
+	"github.com/startower-observability/blackcat/internal/observability"
 )
 
 var daemonWorkers int
@@ -151,6 +152,18 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 	var coreStore *memory.CoreStore
 	if sqliteMemStore != nil {
 		coreStore = memory.NewCoreStore(sqliteMemStore.DB())
+	}
+
+	// Create cost tracker (shares the SQLite DB)
+	var costTracker *observability.CostTracker
+	if sqliteMemStore != nil {
+		var costErr error
+		costTracker, costErr = observability.NewCostTracker(sqliteMemStore.DB())
+		if costErr != nil {
+			slog.Warn("cost tracker unavailable", "error", costErr)
+		} else {
+			slog.Info("cost tracking enabled")
+		}
 	}
 
 	// Migrate MEMORY.md to archival (idempotent)
@@ -332,6 +345,7 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 		MemoryFileStore:  fileMemStore,
 		CoreStore:        coreStore,
 		Guardrails:       guardrailsPipeline,
+		CostTracker:      costTracker,
 	}
 
 	bus := channel.NewMessageBus(256)
@@ -546,7 +560,38 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 				// Acknowledgment: typing indicator is sent by the WhatsApp channel
 				// on message receipt (whatsapp.go event handler). No text ack needed.
 
+				// Create event stream for this message
+				eventCh := make(chan agent.AgentEvent, 32)
+				loopCfg.EventStream = eventCh
+
+				// Forward select events to the user as interim progress messages
+				go func() {
+					for ev := range eventCh {
+						switch ev.Kind {
+						case agent.EventToolCallStart:
+							progressMsg := types.Message{
+								ID:          fmt.Sprintf("progress-%s-%d", m.ID, ev.TurnNum),
+								ChannelType: m.ChannelType,
+								ChannelID:   m.ChannelID,
+								Content:     fmt.Sprintf("⚙️ %s", ev.Message),
+								ReplyTo:     m.ID,
+								Timestamp:   time.Now(),
+							}
+							sendCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+							_ = bus.Send(sendCtx, m.ChannelType, progressMsg)
+							cancel()
+						case agent.EventInterrupted:
+							// Approval request is handled by HITL — do not double-send
+						case agent.EventError:
+							// Error messages are handled by the Run() return value
+						default:
+							// EventThinking, EventDone, EventHandoff — skip (noisy or duplicated)
+						}
+					}
+				}()
+
 				execution, runErr := agent.NewLoop(loopCfg).Run(ctx, m.Content)
+				close(eventCh)
 				response := ""
 				if runErr != nil {
 					slog.Error("agent error", "err", runErr, "channel", m.ChannelType, "user", m.UserID)
@@ -573,6 +618,7 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 							}
 						}
 						// Retry with trimmed context
+						loopCfg.EventStream = nil // eventCh is closed; disable streaming for retry
 						retryExecution, retryErr := agent.NewLoop(loopCfg).Run(ctx, m.Content)
 						if retryErr != nil {
 							slog.Error("retry after compaction failed", "err", retryErr)

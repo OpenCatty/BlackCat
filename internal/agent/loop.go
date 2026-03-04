@@ -18,6 +18,7 @@ import (
 	"github.com/startower-observability/blackcat/internal/skills"
 	"github.com/startower-observability/blackcat/internal/tools"
 	"github.com/startower-observability/blackcat/internal/types"
+	"github.com/startower-observability/blackcat/internal/observability"
 	"github.com/startower-observability/blackcat/internal/workspace"
 )
 
@@ -46,6 +47,9 @@ type Loop struct {
 	coreStore          *memory.CoreStore
 	guardrails         *guardrailsPkg.Pipeline
 	interruptMgr       *InterruptManager
+	eventStream        chan<- AgentEvent
+	traceID        string
+	costTracker    *observability.CostTracker
 }
 
 type LoopConfig struct {
@@ -70,6 +74,8 @@ type LoopConfig struct {
 	UserID             string
 	CoreStore          *memory.CoreStore
 	Guardrails         *guardrailsPkg.Pipeline
+	EventStream    chan<- AgentEvent
+	CostTracker    *observability.CostTracker // optional, nil skips recording
 }
 
 func NewLoop(cfg LoopConfig) *Loop {
@@ -136,11 +142,14 @@ func NewLoop(cfg LoopConfig) *Loop {
 		coreStore:          cfg.CoreStore,
 		guardrails:         cfg.Guardrails,
 		interruptMgr:       NewInterruptManager(),
+		eventStream:        cfg.EventStream,
+		costTracker:        cfg.CostTracker,
 	}
 }
 
 func (l *Loop) Run(ctx context.Context, userMessage string) (*Execution, error) {
 	execution := NewExecution(l.maxTurns)
+	l.traceID = observability.NewTraceID()
 
 	systemPrompt, err := l.buildSystemPrompt(ctx)
 	if err != nil {
@@ -193,9 +202,14 @@ func (l *Loop) Run(ctx context.Context, userMessage string) (*Execution, error) 
 }
 
 func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDefs []types.ToolDefinition) NextStep {
+	span := observability.NewTurnSpan(l.traceID, execution.TurnCount, l.modelName, l.providerName)
+	defer span.End(ctx)
+
 	if l.hooks != nil {
 		if err := l.fireHook(ctx, hooks.PreChat, &hooks.HookContext{Metadata: map[string]any{"messages": execution.Messages}}); err != nil {
 			execution.Error = err
+			span.Outcome = "error"
+			span.ErrorMsg = err.Error()
 			return Error
 		}
 	}
@@ -208,15 +222,23 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 		return Handoff
 	}
 
+	// Emit thinking event before LLM call
+	l.emit(l.eventStream, AgentEvent{Kind: EventThinking, TurnNum: execution.TurnCount, Message: fmt.Sprintf("Thinking (turn %d)...", execution.TurnCount)})
+
 	resp, err := llm.RetryChat(ctx, l.llm, execution.Messages, toolDefs, 3)
 	if err != nil {
 		execution.Error = err
+		l.emit(l.eventStream, AgentEvent{Kind: EventError, TurnNum: execution.TurnCount, Error: err.Error()})
+		span.Outcome = "error"
+		span.ErrorMsg = err.Error()
 		return Error
 	}
 
 	if l.hooks != nil {
 		if err := l.fireHook(ctx, hooks.PostChat, &hooks.HookContext{LLMResponse: resp}); err != nil {
 			execution.Error = err
+			span.Outcome = "error"
+			span.ErrorMsg = err.Error()
 			return Error
 		}
 	}
@@ -225,18 +247,34 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 	execution.TotalUsage.CompletionTokens += resp.Usage.CompletionTokens
 	execution.TotalUsage.TotalTokens += resp.Usage.TotalTokens
 
+	span.InputTokens = resp.Usage.PromptTokens
+	span.OutputTokens = resp.Usage.CompletionTokens
+
+	// Record token cost if tracker is available
+	if l.costTracker != nil {
+		_ = l.costTracker.Record(ctx, l.userID, "", l.modelName, l.providerName,
+			resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+	}
+
 	execution.TurnCount++
 
 	if len(resp.ToolCalls) == 0 {
 		execution.AddAssistantMessage(resp.Content, nil)
 		execution.Response = resp.Content
 		execution.Done = true
+		l.emit(l.eventStream, AgentEvent{Kind: EventDone, TurnNum: execution.TurnCount, Result: execution.Response})
+		span.Outcome = "final_output"
 		return FinalOutput
 	}
 
 	execution.AddAssistantMessage(resp.Content, resp.ToolCalls)
 
 	for _, call := range resp.ToolCalls {
+		span.ToolCallCount++
+		span.ToolNames = append(span.ToolNames, call.Name)
+		// Emit tool call start event
+		l.emit(l.eventStream, AgentEvent{Kind: EventToolCallStart, TurnNum: execution.TurnCount, ToolName: call.Name, ToolArgs: string(call.Arguments), Message: fmt.Sprintf("Calling %s...", call.Name)})
+
 		if l.hooks != nil {
 			hctx := &hooks.HookContext{ToolName: call.Name, Metadata: map[string]any{"args": call.Arguments}}
 			if err := l.fireHook(ctx, hooks.PreToolExec, hctx); err != nil {
@@ -252,6 +290,8 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 				}
 				pa := l.interruptMgr.CreateApproval(l.userID, call.Name, string(call.Arguments), result.Reason, defaultApprovalTimeout)
 				execution.PendingApproval = pa
+				l.emit(l.eventStream, AgentEvent{Kind: EventInterrupted, TurnNum: execution.TurnCount, Message: "Waiting for approval..."})
+				span.Outcome = "interrupted"
 				return Interrupted
 			}
 		}
@@ -265,9 +305,12 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 					errorMsg := fmt.Sprintf("Validation error: %s. Please fix your arguments and try again.", valErr.Error())
 					scrubbedMsg := l.scrubber.Scrub(errorMsg)
 					execution.AddToolResult(call.ID, call.Name, scrubbedMsg)
+					span.Outcome = "run_again"
 					return RunAgain
 				}
 				execution.Error = fmt.Errorf("tool %q exceeded max retries: %w", call.Name, valErr)
+				span.Outcome = "error"
+				span.ErrorMsg = execution.Error.Error()
 				return Error
 			}
 			slog.Warn("tool execution error, feeding back to LLM", "tool", call.Name, "err", err)
@@ -278,12 +321,17 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 			hctx := &hooks.HookContext{ToolName: call.Name, Metadata: map[string]any{"args": call.Arguments, "result": toolResult}}
 			if err := l.fireHook(ctx, hooks.PostToolExec, hctx); err != nil {
 				execution.Error = err
+				span.Outcome = "error"
+				span.ErrorMsg = err.Error()
 				return Error
 			}
 		}
 
 		scrubbedResult := l.scrubber.Scrub(toolResult)
 		execution.AddToolResult(call.ID, call.Name, scrubbedResult)
+
+		// Emit tool call result event
+		l.emit(l.eventStream, AgentEvent{Kind: EventToolCallResult, TurnNum: execution.TurnCount, ToolName: call.Name, Result: truncate(scrubbedResult, 200)})
 
 		if tool, getErr := l.tools.Get(call.Name); getErr == nil {
 			execution.ToolMappings[call.ID] = tool
@@ -292,9 +340,12 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 
 	if execution.TurnCount >= execution.MaxTurns {
 		execution.Error = types.ErrMaxTurnsExceeded
+		span.Outcome = "error"
+		span.ErrorMsg = types.ErrMaxTurnsExceeded.Error()
 		return Error
 	}
 
+	span.Outcome = "run_again"
 	return RunAgain
 }
 
