@@ -1,4 +1,4 @@
-//go:build !nospa
+//go:build spa
 
 package dashboard
 

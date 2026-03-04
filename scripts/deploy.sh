@@ -58,7 +58,7 @@ fi
 source "$ENV_FILE"
 
 # Validate required variables
-for var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_HOME DEPLOY_WORKDIR \
+for var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_HOME \
            DEPLOY_CONFIG_PATH BLACKCAT_BINARY OPENCODE_BINARY OPENCODE_PORT \
            VAULT_PASSPHRASE; do
   if [[ -z "${!var:-}" ]]; then
@@ -90,43 +90,22 @@ else
 fi
 
 # ============================================================================
-# Step 3: Pull latest code on VM
+# Step 3: Install latest blackcat binary on VM via go install
 # ============================================================================
-info "Step 3: Pulling latest code on VM..."
+info "Step 3: Installing latest blackcat binary on VM (go install)..."
 
-$SSH_CMD "cd $DEPLOY_WORKDIR && git pull"
-
-ok "Code updated on VM"
-
-# ============================================================================
-# Step 3.5: Build React SPA on VM
-# ============================================================================
-info "Step 3.5: Building React SPA on VM..."
-
-$SSH_CMD << 'NODE_EOF'
-  # Install Node.js if not present
-  if ! command -v node >/dev/null 2>&1; then
-    echo "[deploy] Node.js not found — installing Node.js 22.x..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-    sudo apt-get install -y nodejs
+$SSH_CMD bash -s "$BLACKCAT_BINARY" << 'GOINSTALL_EOF'
+  TARGET_BINARY="$1"
+  export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
+  mkdir -p "$(dirname "$TARGET_BINARY")"
+  CGO_ENABLED=1 go install -tags 'fts5 spa' github.com/startower-observability/blackcat@latest
+  INSTALLED="$(go env GOPATH)/bin/blackcat"
+  if [[ "$INSTALLED" != "$TARGET_BINARY" ]]; then
+    cp "$INSTALLED" "$TARGET_BINARY"
   fi
-  echo "[deploy] Node.js version: $(node --version)"
-NODE_EOF
+GOINSTALL_EOF
 
-# Run npm install and build (interpolate DEPLOY_WORKDIR from local env)
-$SSH_CMD "cd $DEPLOY_WORKDIR/web && npm ci && npm run build"
-
-ok "React SPA built"
-
-# ============================================================================
-# Step 4: Build binary on VM
-# ============================================================================
-info "Step 4: Building binary on VM..."
-
-$SSH_CMD "cd $DEPLOY_WORKDIR && mkdir -p \$(dirname $BLACKCAT_BINARY) && CGO_ENABLED=1 /usr/local/go/bin/go build -tags fts5 -o $BLACKCAT_BINARY ."
-
-ok "Binary built to $BLACKCAT_BINARY"
-
+ok "Binary installed to $BLACKCAT_BINARY"
 # ============================================================================
 # Step 5: Stop running services
 # ============================================================================
