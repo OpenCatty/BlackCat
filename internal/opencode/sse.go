@@ -47,6 +47,7 @@ func (c *Client) SubscribeEvents(ctx context.Context, sessionID string, handler 
 // parseSSEStream reads the SSE stream and dispatches events.
 func parseSSEStream(resp *http.Response, sessionID string, handler EventHandler) error {
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // 1 MB max to handle large SSE events
 	var dataLines []string
 
 	for scanner.Scan() {
@@ -251,9 +252,10 @@ func parseSSEStreamWithID(
 	mu *sync.Mutex,
 ) error {
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // 1 MB max to handle large SSE events
 	var (
-		dataLines  []string
-		currentID  string
+		dataLines []string
+		currentID string
 	)
 
 	for scanner.Scan() {
