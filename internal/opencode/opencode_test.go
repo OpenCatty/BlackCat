@@ -180,9 +180,8 @@ func TestRunAsync(t *testing.T) {
 			// CreateSession
 			json.NewEncoder(w).Encode(Session{ID: "async-sess"})
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/prompt_async"):
-			// Prompt
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"messageID": "msg-1"})
+			// Prompt — returns 204 No Content
+			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodGet && r.URL.Path == "/global/event":
 			// SSE stream
 			w.Header().Set("Content-Type", "text/event-stream")

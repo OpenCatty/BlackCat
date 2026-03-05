@@ -29,7 +29,7 @@ type TaskRequest struct {
 // TaskResult holds the outcome of a completed task.
 type TaskResult struct {
 	SessionID string
-	Messages  []Message
+	Messages  []MessageWithParts
 }
 
 // SessionManager orchestrates the full lifecycle of an OpenCode task:
@@ -66,7 +66,7 @@ func (m *SessionManager) Run(ctx context.Context, req TaskRequest) (*TaskResult,
 		pr.ProviderID = &req.ProviderID
 	}
 
-	if _, err := m.client.Prompt(ctx, sessionID, pr); err != nil {
+	if err := m.client.Prompt(ctx, sessionID, pr); err != nil {
 		return nil, fmt.Errorf("send prompt: %w", err)
 	}
 
@@ -145,7 +145,7 @@ func (m *SessionManager) RunAsync(ctx context.Context, req TaskRequest) (<-chan 
 		pr.ProviderID = &req.ProviderID
 	}
 
-	if _, err := m.client.Prompt(ctx, sessionID, pr); err != nil {
+	if err := m.client.Prompt(ctx, sessionID, pr); err != nil {
 		return nil, fmt.Errorf("send prompt: %w", err)
 	}
 

@@ -72,18 +72,16 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) error {
 }
 
 // ListMessages calls GET /session/:id/message.
-func (c *Client) ListMessages(ctx context.Context, sessionID string) ([]Message, error) {
-	var r []Message
+// The API returns an array of {info: Message, parts: []Part} envelopes.
+func (c *Client) ListMessages(ctx context.Context, sessionID string) ([]MessageWithParts, error) {
+	var r []MessageWithParts
 	return r, c.get(ctx, "/session/"+sessionID+"/message", &r)
 }
 
 // Prompt sends a prompt to a session asynchronously (POST /session/:id/prompt_async).
-// The server returns a message ID immediately; watch the SSE stream for results.
-func (c *Client) Prompt(ctx context.Context, sessionID string, req PromptRequest) (string, error) {
-	var r struct {
-		MessageID string `json:"messageID"`
-	}
-	return r.MessageID, c.post(ctx, "/session/"+sessionID+"/prompt_async", req, &r)
+// The server returns 204 No Content; watch the SSE stream for results.
+func (c *Client) Prompt(ctx context.Context, sessionID string, req PromptRequest) error {
+	return c.post(ctx, "/session/"+sessionID+"/prompt_async", req, nil)
 }
 
 // RespondToPermission approves or denies a permission request.
@@ -157,7 +155,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		b, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("opencode API %s %s: HTTP %d: %s", method, path, resp.StatusCode, string(b))
 	}
-	if out != nil {
+	if out != nil && resp.StatusCode != http.StatusNoContent {
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
 	return nil

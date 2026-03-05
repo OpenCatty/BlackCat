@@ -74,6 +74,13 @@ type Message struct {
 	Summary    *bool           `json:"summary,omitempty"`
 }
 
+// MessageWithParts is the API response envelope for GET /session/:id/message.
+// Each item wraps a Message in "info" and its Parts inline.
+type MessageWithParts struct {
+	Info  Message `json:"info"`
+	Parts []Part  `json:"parts"`
+}
+
 type MessageError struct {
 	Name string          `json:"name"`
 	Data json.RawMessage `json:"data"`

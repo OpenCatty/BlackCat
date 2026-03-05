@@ -34,12 +34,9 @@ func newMockOpenCodeServer(delaySSE time.Duration, skipCreateSession bool) *http
 		})
 	})
 
-	// POST /session/{id}/prompt_async — send a prompt.
+	// POST /session/{id}/prompt_async — send a prompt (returns 204 No Content).
 	mux.HandleFunc("POST /session/{id}/prompt_async", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"messageID": "msg-1",
-		})
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	// GET /global/event — SSE stream that emits session.status idle.
@@ -69,20 +66,31 @@ func newMockOpenCodeServer(delaySSE time.Duration, skipCreateSession bool) *http
 		flusher.Flush()
 	})
 
-	// GET /session/{id}/message — list messages.
+	// GET /session/{id}/message — list messages (envelope format: {info, parts}).
 	mux.HandleFunc("GET /session/{id}/message", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		messages := []opencode.Message{
+		helloText := "Hello! I fixed the bug."
+		messages := []opencode.MessageWithParts{
 			{
-				ID:        "msg-user-1",
-				SessionID: "test-session-1",
-				Role:      "user",
+				Info: opencode.Message{
+					ID:        "msg-user-1",
+					SessionID: "test-session-1",
+					Role:      "user",
+				},
+				Parts: []opencode.Part{
+					{ID: "prt-1", Type: "text", Text: strPtr("Fix the bug")},
+				},
 			},
 			{
-				ID:        "msg-asst-1",
-				SessionID: "test-session-1",
-				Role:      "assistant",
-				Agent:     "code",
+				Info: opencode.Message{
+					ID:        "msg-asst-1",
+					SessionID: "test-session-1",
+					Role:      "assistant",
+					Agent:     "code",
+				},
+				Parts: []opencode.Part{
+					{ID: "prt-2", Type: "text", Text: &helloText},
+				},
 			},
 		}
 		json.NewEncoder(w).Encode(messages)
@@ -90,6 +98,8 @@ func newMockOpenCodeServer(delaySSE time.Duration, skipCreateSession bool) *http
 
 	return httptest.NewServer(mux)
 }
+
+func strPtr(s string) *string { return &s }
 
 func TestOpenCodeToolExecute(t *testing.T) {
 	srv := newMockOpenCodeServer(0, false)
@@ -117,8 +127,8 @@ func TestOpenCodeToolExecute(t *testing.T) {
 	if !strings.Contains(result, "Messages: 2") {
 		t.Errorf("result missing message count: %s", result)
 	}
-	if !strings.Contains(result, "msg-asst-1") {
-		t.Errorf("result missing assistant message content: %s", result)
+	if !strings.Contains(result, "Hello! I fixed the bug.") {
+		t.Errorf("result missing assistant text content: %s", result)
 	}
 	t.Logf("result:\n%s", result)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/startower-observability/blackcat/internal/opencode"
@@ -98,7 +99,7 @@ func (t *OpenCodeTool) Execute(ctx context.Context, args json.RawMessage) (strin
 	// Extract the last assistant message.
 	assistantContent := "(no assistant response)"
 	for i := len(result.Messages) - 1; i >= 0; i-- {
-		if result.Messages[i].Role == "assistant" {
+		if result.Messages[i].Info.Role == "assistant" {
 			assistantContent = extractMessageContent(result.Messages[i])
 			break
 		}
@@ -112,14 +113,20 @@ func (t *OpenCodeTool) Execute(ctx context.Context, args json.RawMessage) (strin
 }
 
 // extractMessageContent returns a human-readable summary of a message.
-// Since Message doesn't carry inline text (content is in Parts), we use
-// the model/agent info as a fallback indicator.
-func extractMessageContent(msg opencode.Message) string {
-	// The message ID serves as a reference; actual content would require
-	// fetching parts. For the tool output we report what we have.
-	agent := msg.Agent
+// It concatenates all text parts from the message.
+func extractMessageContent(msg opencode.MessageWithParts) string {
+	var texts []string
+	for _, p := range msg.Parts {
+		if p.Type == "text" && p.Text != nil && *p.Text != "" {
+			texts = append(texts, *p.Text)
+		}
+	}
+	if len(texts) > 0 {
+		return strings.Join(texts, "\n")
+	}
+	agent := msg.Info.Agent
 	if agent == "" {
 		agent = "assistant"
 	}
-	return fmt.Sprintf("[%s] message %s", agent, msg.ID)
+	return fmt.Sprintf("[%s] message %s (no text parts)", agent, msg.Info.ID)
 }
