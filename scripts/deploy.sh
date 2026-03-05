@@ -90,15 +90,24 @@ else
 fi
 
 # ============================================================================
-# Step 3: Install latest blackcat binary on VM via go install
+# Step 3: Stop running services (before replacing binary)
 # ============================================================================
-info "Step 3: Installing latest blackcat binary on VM (go install)..."
+info "Step 3: Stopping services before binary update..."
+
+$SSH_CMD "systemctl --user stop blackcat opencode 2>/dev/null || true; sleep 1"
+
+ok "Services stopped"
+
+# ============================================================================
+# Step 4: Install latest blackcat binary on VM via go install
+# ============================================================================
+info "Step 4: Installing latest blackcat binary on VM (go install)..."
 
 $SSH_CMD bash -s "$BLACKCAT_BINARY" << 'GOINSTALL_EOF'
   TARGET_BINARY="$1"
   export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
   mkdir -p "$(dirname "$TARGET_BINARY")"
-  CGO_ENABLED=1 go install -tags 'fts5 spa' github.com/startower-observability/blackcat@latest
+  CGO_ENABLED=1 go install -tags 'fts5' github.com/startower-observability/blackcat@latest
   INSTALLED="$(go env GOPATH)/bin/blackcat"
   if [[ "$INSTALLED" != "$TARGET_BINARY" ]]; then
     cp "$INSTALLED" "$TARGET_BINARY"
@@ -106,15 +115,6 @@ $SSH_CMD bash -s "$BLACKCAT_BINARY" << 'GOINSTALL_EOF'
 GOINSTALL_EOF
 
 ok "Binary installed to $BLACKCAT_BINARY"
-# ============================================================================
-# Step 5: Stop running services
-# ============================================================================
-info "Step 5: Stopping services..."
-
-$SSH_CMD "systemctl --user stop blackcat opencode 2>/dev/null || true; sleep 1"
-
-ok "Services stopped"
-
 # ============================================================================
 # Step 6: Upload service files
 # ============================================================================
