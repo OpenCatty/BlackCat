@@ -45,13 +45,25 @@ func TestDashboardSchedulePage(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.StatusCode)
 	}
 	contentType := res.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "text/html") {
-		t.Fatalf("expected text/html, got %q", contentType)
+	if !strings.HasPrefix(contentType, "application/json") {
+		t.Fatalf("expected application/json, got %q", contentType)
 	}
-	body := mustReadBody(t, res)
-	// calendar-container should be present
-	if !strings.Contains(body, "calendar-container") {
-		t.Fatalf("expected calendar-container in body, got %q", body[:min(200, len(body))])
+	var payload struct {
+		Year      int    `json:"year"`
+		Month     int    `json:"month"`
+		MonthName string `json:"month_name"`
+		Weeks     []struct {
+			Days [7]struct{} `json:"days"`
+		} `json:"weeks"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed to decode JSON: %v", err)
+	}
+	if payload.Year <= 0 || payload.Month <= 0 || payload.MonthName == "" {
+		t.Fatalf("unexpected schedule payload: %#v", payload)
+	}
+	if len(payload.Weeks) == 0 {
+		t.Fatal("expected non-empty weeks")
 	}
 }
 
@@ -71,12 +83,22 @@ func TestDashboardSchedulePageMonthNav(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.StatusCode)
 	}
-	body := mustReadBody(t, res)
-	if !strings.Contains(body, "March") {
-		t.Fatalf("expected 'March' in body for month=3, got %q", body[:min(500, len(body))])
+	var payload struct {
+		Year      int    `json:"year"`
+		Month     int    `json:"month"`
+		MonthName string `json:"month_name"`
 	}
-	if !strings.Contains(body, "2025") {
-		t.Fatalf("expected '2025' in body, got %q", body[:min(500, len(body))])
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed to decode JSON: %v", err)
+	}
+	if payload.Year != 2025 {
+		t.Fatalf("expected year=2025, got %d", payload.Year)
+	}
+	if payload.Month != 3 {
+		t.Fatalf("expected month=3, got %d", payload.Month)
+	}
+	if payload.MonthName != "March" {
+		t.Fatalf("expected month_name='March', got %q", payload.MonthName)
 	}
 }
 

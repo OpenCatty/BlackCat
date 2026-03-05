@@ -420,3 +420,55 @@ func TestWebToolInvalidURL(t *testing.T) {
 		t.Fatal("expected error for empty URL, got nil")
 	}
 }
+
+func TestWebToolPinchTabFlow(t *testing.T) {
+	t.Parallel()
+
+	startCalled := false
+	openCalled := false
+	textCalled := false
+	stopCalled := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer pinch-secret" {
+			t.Fatalf("expected Authorization header, got %q", got)
+		}
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/instances/start":
+			startCalled = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"inst_123"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/instances/inst_123/tabs/open":
+			openCalled = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"tab_456"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/tabs/tab_456/text":
+			textCalled = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"text":"hello from pinchtab"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/instances/inst_123/stop":
+			stopCalled = true
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	tool := NewWebTool(5 * time.Second)
+	tool.pinchEnabled = true
+	tool.pinchBaseURL = server.URL
+	tool.pinchToken = "pinch-secret"
+
+	result, err := tool.executeViaPinchTab(context.Background(), "https://example.com")
+	if err != nil {
+		t.Fatalf("executeViaPinchTab returned error: %v", err)
+	}
+	if result != "hello from pinchtab" {
+		t.Fatalf("expected pinchtab text, got %q", result)
+	}
+	if !startCalled || !openCalled || !textCalled || !stopCalled {
+		t.Fatalf("expected full pinch flow to be called, got start=%v open=%v text=%v stop=%v", startCalled, openCalled, textCalled, stopCalled)
+	}
+}

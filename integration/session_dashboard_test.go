@@ -17,8 +17,8 @@ import (
 	"unsafe"
 
 	"github.com/startower-observability/blackcat/internal/config"
-	"github.com/startower-observability/blackcat/internal/dashboard"
 	"github.com/startower-observability/blackcat/internal/daemon"
+	"github.com/startower-observability/blackcat/internal/dashboard"
 	"github.com/startower-observability/blackcat/internal/scheduler"
 	"github.com/startower-observability/blackcat/internal/session"
 	"github.com/startower-observability/blackcat/internal/types"
@@ -203,6 +203,7 @@ func TestDashboardSSEEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
+	req.Header.Set("Authorization", "Bearer test-token")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

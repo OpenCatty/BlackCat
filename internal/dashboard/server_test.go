@@ -105,6 +105,13 @@ func noRedirectClient() *http.Client {
 	}
 }
 
+func expectedSPAStatusCode() int {
+	if spaAvailable() {
+		return http.StatusOK
+	}
+	return http.StatusNotFound
+}
+
 // ---------------------------------------------------------------------------
 // Integration tests (12)
 // ---------------------------------------------------------------------------
@@ -118,13 +125,18 @@ func TestLoginPageServesSPA(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	expectedStatus := expectedSPAStatusCode()
+	if resp.StatusCode != expectedStatus {
+		t.Fatalf("expected status %d, got %d", expectedStatus, resp.StatusCode)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(body), `id="root"`) {
-		t.Fatal("expected SPA body to contain id=\"root\"")
+	if spaAvailable() {
+		if !strings.Contains(string(body), `id="root"`) {
+			t.Fatal("expected SPA body to contain id=\"root\"")
+		}
+	} else if !strings.Contains(string(body), "SPA not available") {
+		t.Fatalf("expected nospa message in body, got %q", string(body))
 	}
 }
 
@@ -228,8 +240,9 @@ func TestCookieAuth(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	expectedStatus := expectedSPAStatusCode()
+	if resp.StatusCode != expectedStatus {
+		t.Fatalf("expected status %d, got %d", expectedStatus, resp.StatusCode)
 	}
 }
 
@@ -270,8 +283,9 @@ func TestBearerAuthStillWorks(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	expectedStatus := expectedSPAStatusCode()
+	if resp.StatusCode != expectedStatus {
+		t.Fatalf("expected status %d, got %d", expectedStatus, resp.StatusCode)
 	}
 }
 
@@ -376,13 +390,18 @@ func TestSPAServedOnIndex(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	expectedStatus := expectedSPAStatusCode()
+	if resp.StatusCode != expectedStatus {
+		t.Fatalf("expected status %d, got %d", expectedStatus, resp.StatusCode)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(body), `id="root"`) {
-		t.Fatal("expected SPA body to contain id=\"root\"")
+	if spaAvailable() {
+		if !strings.Contains(string(body), `id="root"`) {
+			t.Fatal("expected SPA body to contain id=\"root\"")
+		}
+	} else if !strings.Contains(string(body), "SPA not available") {
+		t.Fatalf("expected nospa message in body, got %q", string(body))
 	}
 }
 
@@ -399,13 +418,18 @@ func TestSPAFallbackOnUnknownPath(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	expectedStatus := expectedSPAStatusCode()
+	if resp.StatusCode != expectedStatus {
+		t.Fatalf("expected status %d, got %d", expectedStatus, resp.StatusCode)
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(body), `id="root"`) {
-		t.Fatal("expected SPA fallback body to contain id=\"root\"")
+	if spaAvailable() {
+		if !strings.Contains(string(body), `id="root"`) {
+			t.Fatal("expected SPA fallback body to contain id=\"root\"")
+		}
+	} else if !strings.Contains(string(body), "SPA not available") {
+		t.Fatalf("expected nospa message in body, got %q", string(body))
 	}
 }
 

@@ -13,8 +13,8 @@ import (
 	"unsafe"
 
 	"github.com/startower-observability/blackcat/internal/config"
-	"github.com/startower-observability/blackcat/internal/dashboard"
 	"github.com/startower-observability/blackcat/internal/daemon"
+	"github.com/startower-observability/blackcat/internal/dashboard"
 	"github.com/startower-observability/blackcat/internal/scheduler"
 )
 
@@ -57,7 +57,7 @@ func TestDashboardFullAuth(t *testing.T) {
 	ts := newDashboardFlowTestServer(t, server)
 	t.Cleanup(ts.Close)
 
-	res := mustRequest(t, ts.URL+"/dashboard/", "")
+	res := mustRequest(t, ts.URL+"/dashboard/api/status", "")
 	if res.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected unauthorized status %d, got %d", http.StatusUnauthorized, res.StatusCode)
 	}
@@ -65,12 +65,15 @@ func TestDashboardFullAuth(t *testing.T) {
 		t.Fatalf("expected unauthorized body, got %q", mustReadBody(t, res))
 	}
 
-	res = mustRequest(t, ts.URL+"/dashboard/", "secret")
+	res = mustRequest(t, ts.URL+"/dashboard/api/status", "secret")
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected authorized status %d, got %d", http.StatusOK, res.StatusCode)
 	}
-	if contentType := res.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
-		t.Fatalf("expected text/html content-type, got %q", contentType)
+	if contentType := res.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "application/json") {
+		t.Fatalf("expected application/json content-type, got %q", contentType)
+	}
+	if !strings.Contains(mustReadBody(t, res), `"healthy"`) {
+		t.Fatalf("expected status payload to include healthy field, got %q", mustReadBody(t, res))
 	}
 }
 
@@ -151,7 +154,7 @@ func TestDashboardSSELifecycle(t *testing.T) {
 	ts := newDashboardFlowTestServer(t, server)
 	t.Cleanup(ts.Close)
 
-	res := mustRequest(t, ts.URL+"/dashboard/events", "")
+	res := mustRequest(t, ts.URL+"/dashboard/events", "secret")
 	t.Cleanup(func() { _ = res.Body.Close() })
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.StatusCode)
@@ -222,8 +225,11 @@ func TestDashboardTemplateDevOverride(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.StatusCode)
 	}
 	body := mustReadBody(t, res)
-	if !strings.Contains(body, "DEV-OVERRIDE-MARKER") {
-		t.Fatalf("expected dev override marker in body, got %q", body)
+	if contentType := res.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "application/json") {
+		t.Fatalf("expected application/json content-type, got %q", contentType)
+	}
+	if !strings.Contains(body, "\"agent-x\"") {
+		t.Fatalf("expected agent payload in body, got %q", body)
 	}
 }
 
