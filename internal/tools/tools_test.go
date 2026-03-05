@@ -421,7 +421,50 @@ func TestWebToolInvalidURL(t *testing.T) {
 	}
 }
 
-func TestWebToolPinchTabFlow(t *testing.T) {
+func TestWebToolPinchTabDefaultFlow(t *testing.T) {
+	t.Parallel()
+
+	navigateCalled := false
+	textCalled := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer pinch-secret" {
+			t.Fatalf("expected Authorization header, got %q", got)
+		}
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/navigate":
+			navigateCalled = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"title":"Example","url":"https://example.com"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/text":
+			textCalled = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"text":"hello from pinchtab default flow"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	tool := NewWebTool(5 * time.Second)
+	tool.pinchEnabled = true
+	tool.pinchBaseURL = server.URL
+	tool.pinchToken = "pinch-secret"
+
+	result, err := tool.executeViaPinchTab(context.Background(), "https://example.com")
+	if err != nil {
+		t.Fatalf("executeViaPinchTab returned error: %v", err)
+	}
+	if result != "hello from pinchtab default flow" {
+		t.Fatalf("expected pinchtab default text, got %q", result)
+	}
+	if !navigateCalled || !textCalled {
+		t.Fatalf("expected default flow endpoints to be called, got navigate=%v text=%v", navigateCalled, textCalled)
+	}
+}
+
+func TestWebToolPinchTabLegacyFlow(t *testing.T) {
 	t.Parallel()
 
 	startCalled := false
@@ -461,9 +504,9 @@ func TestWebToolPinchTabFlow(t *testing.T) {
 	tool.pinchBaseURL = server.URL
 	tool.pinchToken = "pinch-secret"
 
-	result, err := tool.executeViaPinchTab(context.Background(), "https://example.com")
+	result, err := tool.executeViaPinchTabInstanceFlow(context.Background(), "https://example.com")
 	if err != nil {
-		t.Fatalf("executeViaPinchTab returned error: %v", err)
+		t.Fatalf("executeViaPinchTabInstanceFlow returned error: %v", err)
 	}
 	if result != "hello from pinchtab" {
 		t.Fatalf("expected pinchtab text, got %q", result)

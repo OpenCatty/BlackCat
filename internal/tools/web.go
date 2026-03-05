@@ -171,6 +171,70 @@ func (t *WebTool) Execute(ctx context.Context, args json.RawMessage) (string, er
 }
 
 func (t *WebTool) executeViaPinchTab(ctx context.Context, targetURL string) (string, error) {
+	defaultText, defaultErr := t.executeViaPinchTabDefaultFlow(ctx, targetURL)
+	if defaultErr == nil {
+		if strings.TrimSpace(defaultText) == "" {
+			return "", fmt.Errorf("web: pinchtab returned empty text")
+		}
+		return defaultText, nil
+	}
+
+	legacyText, legacyErr := t.executeViaPinchTabInstanceFlow(ctx, targetURL)
+	if legacyErr == nil {
+		if strings.TrimSpace(legacyText) == "" {
+			return "", fmt.Errorf("web: pinchtab returned empty text")
+		}
+		return legacyText, nil
+	}
+
+	return "", fmt.Errorf("web: pinchtab default flow failed: %v; legacy flow failed: %w", defaultErr, legacyErr)
+}
+
+func (t *WebTool) executeViaPinchTabDefaultFlow(ctx context.Context, targetURL string) (string, error) {
+	body := map[string]string{"url": targetURL}
+	buf, _ := json.Marshal(body)
+
+	navResp, err := t.pinchRequest(ctx, http.MethodPost, "/navigate", bytes.NewReader(buf))
+	if err != nil {
+		return "", err
+	}
+	defer navResp.Body.Close()
+	if navResp.StatusCode < 200 || navResp.StatusCode >= 300 {
+		data, _ := io.ReadAll(io.LimitReader(navResp.Body, 1024))
+		return "", fmt.Errorf("navigate status %d: %s", navResp.StatusCode, strings.TrimSpace(string(data)))
+	}
+
+	_, _ = io.Copy(io.Discard, io.LimitReader(navResp.Body, 4096))
+
+	textResp, err := t.pinchRequest(ctx, http.MethodGet, "/text", nil)
+	if err != nil {
+		return "", err
+	}
+	defer textResp.Body.Close()
+	if textResp.StatusCode < 200 || textResp.StatusCode >= 300 {
+		data, _ := io.ReadAll(io.LimitReader(textResp.Body, 1024))
+		return "", fmt.Errorf("text status %d: %s", textResp.StatusCode, strings.TrimSpace(string(data)))
+	}
+
+	bodyBytes, err := io.ReadAll(io.LimitReader(textResp.Body, int64(t.maxSize)+1))
+	if err != nil {
+		return "", err
+	}
+	if len(bodyBytes) > t.maxSize {
+		bodyBytes = bodyBytes[:t.maxSize]
+	}
+
+	var payload struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(bodyBytes, &payload); err == nil && payload.Text != "" {
+		return payload.Text, nil
+	}
+
+	return string(bodyBytes), nil
+}
+
+func (t *WebTool) executeViaPinchTabInstanceFlow(ctx context.Context, targetURL string) (string, error) {
 	instanceID, err := t.pinchStartInstance(ctx)
 	if err != nil {
 		return "", fmt.Errorf("web: pinchtab start instance: %w", err)
@@ -193,9 +257,6 @@ func (t *WebTool) executeViaPinchTab(ctx context.Context, targetURL string) (str
 	text, err := t.pinchReadText(ctx, tabID)
 	if err != nil {
 		return "", fmt.Errorf("web: pinchtab read text: %w", err)
-	}
-	if strings.TrimSpace(text) == "" {
-		return "", fmt.Errorf("web: pinchtab returned empty text")
 	}
 	return text, nil
 }
