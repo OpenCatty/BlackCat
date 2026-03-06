@@ -25,6 +25,7 @@ type Config struct {
 	Profiles     ProfilesConfig     `yaml:"profiles"`     // Profiles directory
 	Agent        AgentConfig        `yaml:"agent"`        // Agent persona and personalization settings
 	RateLimit    RateLimitConfig    `yaml:"rateLimit"`    // Per-user rate limiting
+	Whisper      WhisperConfig      `yaml:"whisper"`      // Groq Whisper voice-to-text configuration
 
 }
 
@@ -158,6 +159,14 @@ type MCPServerConfig struct {
 // SkillsConfig holds skills directory settings.
 type SkillsConfig struct {
 	Dir string `yaml:"dir"` // e.g., "skills/"
+}
+
+// WhisperConfig holds Groq Whisper voice-to-text configuration.
+type WhisperConfig struct {
+	Enabled       bool   `yaml:"enabled" mapstructure:"enabled"`
+	GroqAPIKey    string `yaml:"groqApiKey" mapstructure:"groqApiKey"`
+	Model         string `yaml:"model" mapstructure:"model"`
+	MaxFileSizeMB int    `yaml:"maxFileSizeMb" mapstructure:"maxFileSizeMb"`
 }
 
 // LoggingConfig holds logging settings.
@@ -359,5 +368,13 @@ func (c *Config) Validate() {
 	// HITL defaults
 	if c.Security.HITL.TimeoutMinutes == 0 {
 		c.Security.HITL.TimeoutMinutes = 5
+	}
+
+	// Whisper defaults
+	if c.Whisper.Model == "" {
+		c.Whisper.Model = "whisper-large-v3-turbo"
+	}
+	if c.Whisper.MaxFileSizeMB == 0 {
+		c.Whisper.MaxFileSizeMB = 25
 	}
 }

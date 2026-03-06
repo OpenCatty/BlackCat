@@ -39,6 +39,7 @@ Key environment variables (all prefixed with `BLACKCAT_`):
 | `BLACKCAT_VAULT_PASSPHRASE` | Vault encryption passphrase |
 | `BLACKCAT_ZEN_APIKEY` | Zen/OpenCode.ai API key |
 | `BLACKCAT_OPENCODE_PASSWORD` | OpenCode daemon password |
+| `BLACKCAT_WHISPER_GROQAPIKEY` | Groq API key for voice-to-text (Whisper) |
 
 ## Service Bootstrap
 
@@ -79,6 +80,22 @@ After setup, verify the system is healthy:
 blackcat health            # expect JSON: {"status":"healthy","scheduler":"...","whatsapp":"connected",...}
 blackcat doctor            # full diagnostic with detailed status per subsystem
 ```
+
+## Built-in Skills
+
+BlackCat ships with built-in skills for social media and productivity. Skills are auto-loaded but silently skipped when prerequisites are not met.
+
+| Skill | Required Bins | Required Env Vars |
+|-------|--------------|-------------------|
+| Threads | — | `THREADS_ACCESS_TOKEN` |
+| Twitter/X | `bird` | `TWITTER_AUTH_TOKEN` |
+| LinkedIn | `python3` | `LINKEDIN_LI_AT`, `LINKEDIN_JSESSIONID` |
+| Facebook | — | `FACEBOOK_PAGE_TOKEN` |
+| TikTok | — | `TIKTOK_ACCESS_TOKEN` |
+| Google Workspace | `gws` (Node 18+) | — (uses `gws auth setup`) |
+| Whisper Voice | — | `BLACKCAT_WHISPER_GROQAPIKEY` (+ `whisper.enabled: true` in config) |
+
+Run `blackcat doctor` to verify skill prerequisites.
 
 ## Scheduler Configuration
 
@@ -125,3 +142,6 @@ There is NO `blackcat scheduler` CLI subcommand. Configuration is YAML-only.
 - DON'T look for `blackcat scheduler` CLI — it doesn't exist; use health/doctor
 - DON'T commit secrets or API keys to the repo
 - DON'T use emojis in commit messages or documentation
+- DO install Node.js 18+ if using Google Workspace CLI skill
+- DO run `gws auth setup` before using Google Workspace skill
+- DON'T expect social media skills without setting their env vars

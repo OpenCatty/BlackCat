@@ -115,7 +115,7 @@ func TestListTemplates(t *testing.T) {
 	}
 
 	// Check for expected templates
-	expectedCount := 11 // AGENTS.md, SOUL.md, MEMORY.md, and eight skill templates
+	expectedCount := 17 // AGENTS.md, SOUL.md, MEMORY.md, and fourteen skill templates
 	if len(templates) != expectedCount {
 		t.Errorf("expected %d templates, got %d", expectedCount, len(templates))
 	}
@@ -139,6 +139,12 @@ func TestListTemplates(t *testing.T) {
 		"skills/opencode-handoff.md",
 		"skills/pinchtab-browsing.md",
 		"skills/opencode-commands.md",
+		"skills/threads.md",
+		"skills/twitter.md",
+		"skills/linkedin.md",
+		"skills/facebook.md",
+		"skills/tiktok.md",
+		"skills/google-workspace.md",
 	}
 
 	for _, exp := range expected {

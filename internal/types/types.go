@@ -24,6 +24,10 @@ type Message struct {
 	Timestamp   time.Time         `json:"timestamp"`
 	ReplyTo     string            `json:"replyTo,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
+	// Media fields — populated by channel adapters when a voice/audio message is received
+	MediaType string `json:"media_type,omitempty"` // "voice", "audio", "video_note"
+	MediaURL  string `json:"media_url,omitempty"`  // direct download URL
+	MediaSize int64  `json:"media_size,omitempty"` // file size in bytes
 }
 
 // ToolCall represents an LLM-requested tool invocation.
