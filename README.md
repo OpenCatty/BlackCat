@@ -36,22 +36,12 @@ BlackCat receives your natural language requests, processes them through an LLM-
 
 ### Install
 
-**Linux/macOS** (one-line):
-```bash
-curl -fsSL https://raw.githubusercontent.com/startower-observability/BlackCat/main/scripts/install.sh | sh
-```
-
-**Windows** (PowerShell):
-```powershell
-irm https://raw.githubusercontent.com/startower-observability/BlackCat/main/scripts/install.ps1 | iex
-```
-
-**Or with Go:**
 ```bash
 go install github.com/startower-observability/blackcat@latest
 ```
 
 ### Onboard
+
 ```bash
 blackcat onboard
 ```
@@ -62,6 +52,7 @@ The wizard guides you through:
 3. Installing and starting the daemon
 
 ### Manage the daemon
+
 ```bash
 blackcat status     # check status
 blackcat restart    # restart after config changes
@@ -72,58 +63,19 @@ blackcat stop       # stop the daemon
 
 Deploy BlackCat to a Linux VM with a single command:
 
-### Prerequisites
-
-1. Copy the deploy environment template and fill in your VM details:
-   ```bash
-   cp deploy/deploy.env.example deploy/deploy.env
-   $EDITOR deploy/deploy.env
-   ```
-
-2. Ensure your SSH key has access to the VM.
-
-### Deploy
-
 ```bash
+cp deploy/deploy.env.example deploy/deploy.env
+$EDITOR deploy/deploy.env   # fill in VM details
 make deploy
-```
-
-This single command:
-- Pushes your local git changes to the remote
-- SSHes into the VM, pulls the latest code, and builds the binary
-- Installs the binary to `~/.blackcat/bin/blackcat`
-- Deploys and reloads the `blackcat` and `opencode` systemd services
-- Runs a health check to confirm the service is up
-
-### Quick Redeploy (skip git push)
-
-```bash
-make deploy-no-push
-```
-
-### Health Check Only
-
-```bash
-make verify
 ```
 
 See [`deploy/README.md`](deploy/README.md) for full setup instructions including SSH key configuration and service file details.
 
-## Documentation
-
-| Guide | Description |
-|-------|-------------|
-| [Getting Started](https://startower-observability.github.io/BlackCat/getting-started) | Prerequisites, installation, quick start |
-| [Configuration](https://startower-observability.github.io/BlackCat/configuration) | Full YAML reference, environment variables, examples |
-| [LLM Providers](https://startower-observability.github.io/BlackCat/providers) | All 8 providers: setup, models, configuration |
-| [CLI Reference](https://startower-observability.github.io/BlackCat/cli/onboard) | Reference for all BlackCat commands |
-| [Architecture](https://startower-observability.github.io/BlackCat/concepts/architecture) | How BlackCat works internally |
+For AI agents setting up this project, see [llms.txt](./llms.txt).
 
 ## Configuration
 
 BlackCat is configured via YAML file (`~/.blackcat/config.yaml`) with environment variable overrides using the `BLACKCAT_` prefix.
-
-See [`blackcat.example.yaml`](blackcat.example.yaml) for a complete example with all fields documented.
 
 Key environment variables:
 
@@ -131,9 +83,13 @@ Key environment variables:
 BLACKCAT_LLM_PROVIDER=openai
 BLACKCAT_LLM_APIKEY=sk-your-key
 BLACKCAT_CHANNELS_TELEGRAM_TOKEN=your-bot-token
+BLACKCAT_CHANNELS_DISCORD_TOKEN=your-discord-token
 BLACKCAT_VAULT_PASSPHRASE=your-passphrase
 BLACKCAT_ZEN_APIKEY=your-zen-key
+BLACKCAT_OPENCODE_PASSWORD=your-opencode-password
 ```
+
+See [`blackcat.example.yaml`](blackcat.example.yaml) for a complete example.
 
 ## Docker
 
@@ -145,12 +101,10 @@ See `docker-compose.yml` for the full setup. Requires OpenCode CLI to be accessi
 
 ## Requirements
 
-- Go 1.25+
+- Go 1.25+ (with `CGO_ENABLED=1` for WhatsApp support)
 - OpenCode CLI running on the same server
 - At least one messaging channel configured
 - At least one LLM provider configured
-
-> **Note:** WhatsApp support requires CGO for SQLite. Build with `CGO_ENABLED=1`.
 
 ## License
 
