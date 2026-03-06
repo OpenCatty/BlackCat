@@ -46,6 +46,7 @@ import (
 	"github.com/startower-observability/blackcat/internal/skills"
 	"github.com/startower-observability/blackcat/internal/taskqueue"
 	"github.com/startower-observability/blackcat/internal/tools"
+	"github.com/startower-observability/blackcat/internal/transcription"
 	"github.com/startower-observability/blackcat/internal/types"
 	"github.com/startower-observability/blackcat/internal/workspace"
 )
@@ -571,6 +572,17 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Initialize Whisper transcription client if enabled
+	var groqClient *transcription.GroqClient
+	if cfg.Whisper.Enabled && cfg.Whisper.GroqAPIKey != "" {
+		groqClient = transcription.NewGroqClient(
+			cfg.Whisper.GroqAPIKey,
+			transcription.WithModel(cfg.Whisper.Model),
+			transcription.WithMaxFileSizeMB(cfg.Whisper.MaxFileSizeMB),
+		)
+		slog.Info("Whisper transcription enabled", "model", cfg.Whisper.Model)
+	}
+
 	workers, _ := cmd.Flags().GetInt("workers")
 	if workers <= 0 {
 		workers = 1
@@ -681,6 +693,38 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 						}
 					}
 				}()
+
+				// Transcribe voice/audio messages via Groq Whisper
+				if groqClient != nil && m.MediaType != "" {
+					transcribeCtx, transcribeCancel := context.WithTimeout(ctx, 30*time.Second)
+					var transcribed string
+					var transcribeErr error
+
+					if m.Metadata != nil && m.Metadata["wa_media_requires_download"] == "true" {
+						// WhatsApp: can't use URL directly — skip for now, log warning
+						slog.Warn("WhatsApp voice transcription requires whatsmeow download — skipping",
+							"channel", m.ChannelType, "user", m.UserID)
+					} else if m.MediaURL != "" {
+						transcribed, transcribeErr = groqClient.TranscribeURL(transcribeCtx, m.MediaURL)
+					}
+					transcribeCancel()
+
+					if transcribeErr != nil {
+						slog.Warn("Whisper transcription failed", "error", transcribeErr,
+							"channel", m.ChannelType, "mediaType", m.MediaType)
+						// Don't fail — continue with fallback message
+						m.Content = "[Voice message — transcription failed]"
+					} else if transcribed != "" {
+						m.Content = transcribed
+						if m.Metadata == nil {
+							m.Metadata = make(map[string]string)
+						}
+						m.Metadata["whisper_transcribed"] = "true"
+						m.Metadata["whisper_media_type"] = m.MediaType
+						slog.Info("Whisper transcription complete",
+							"channel", m.ChannelType, "chars", len(transcribed))
+					}
+				}
 
 				execution, runErr := supervisor.RouteWithCfg(ctx, m.Content, loopCfg)
 				close(eventCh)

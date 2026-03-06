@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -210,10 +211,10 @@ func (d *DiscordChannel) Health() types.ChannelHealth {
 	}
 
 	return types.ChannelHealth{
-			Name:    "discord",
-			Healthy: true,
-			Details: "connected and responsive",
-		}
+		Name:    "discord",
+		Healthy: true,
+		Details: "connected and responsive",
+	}
 }
 
 // convertMessage converts a discordgo MessageCreate event to a types.Message.
@@ -227,7 +228,6 @@ func (d *DiscordChannel) Info() types.ChannelInfo {
 		Connected: d.started,
 	}
 }
-
 
 // convertMessage converts a discordgo MessageCreate event to a types.Message.
 func convertMessage(m *discordgo.MessageCreate) types.Message {
@@ -247,6 +247,21 @@ func convertMessage(m *discordgo.MessageCreate) types.Message {
 
 	if m.MessageReference != nil && m.MessageReference.MessageID != "" {
 		msg.ReplyTo = m.MessageReference.MessageID
+	}
+
+	// Detect audio attachments
+	for _, att := range m.Attachments {
+		isAudio := (att.ContentType != "" && strings.HasPrefix(att.ContentType, "audio/")) ||
+			strings.HasSuffix(att.Filename, ".ogg") ||
+			strings.HasSuffix(att.Filename, ".mp3") ||
+			strings.HasSuffix(att.Filename, ".wav") ||
+			strings.HasSuffix(att.Filename, ".m4a")
+		if isAudio {
+			msg.MediaType = "audio"
+			msg.MediaURL = att.URL
+			msg.MediaSize = int64(att.Size)
+			break
+		}
 	}
 
 	return msg

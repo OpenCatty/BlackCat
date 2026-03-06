@@ -75,7 +75,7 @@ func (t *TelegramChannel) Start(ctx context.Context) error {
 				bot.StopReceivingUpdates()
 				return
 			case update := <-updates:
-				msg, ok := convertUpdate(update)
+				msg, ok := t.convertUpdate(update)
 				if !ok {
 					continue
 				}
@@ -216,14 +216,30 @@ func (t *TelegramChannel) Health() types.ChannelHealth {
 	}
 }
 
+// getFileURL returns the download URL and file size for a Telegram file by its FileID.
+func (t *TelegramChannel) getFileURL(fileID string) (string, int64) {
+	file, err := t.bot.GetFile(tgbotapi.FileConfig{FileID: fileID})
+	if err != nil {
+		return "", 0
+	}
+	url := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", t.bot.Token, file.FilePath)
+	return url, int64(file.FileSize)
+}
+
 // convertUpdate converts a tgbotapi.Update to a types.Message.
-// Returns false if the update contains no text content.
-func convertUpdate(update tgbotapi.Update) (types.Message, bool) {
-	if update.Message == nil || update.Message.Text == "" {
+// Returns false if the update contains no usable content (text or media).
+func (t *TelegramChannel) convertUpdate(update tgbotapi.Update) (types.Message, bool) {
+	if update.Message == nil {
 		return types.Message{}, false
 	}
 
 	m := update.Message
+
+	// Skip if no text AND no voice/audio/video_note.
+	if m.Text == "" && m.Voice == nil && m.Audio == nil && m.VideoNote == nil {
+		return types.Message{}, false
+	}
+
 	msg := types.Message{
 		ID:          strconv.Itoa(m.MessageID),
 		ChannelType: types.ChannelTelegram,
@@ -238,6 +254,28 @@ func convertUpdate(update tgbotapi.Update) (types.Message, bool) {
 
 	if m.ReplyToMessage != nil && m.ReplyToMessage.MessageID != 0 {
 		msg.ReplyTo = strconv.Itoa(m.ReplyToMessage.MessageID)
+	}
+
+	// Handle voice message
+	if m.Voice != nil {
+		url, size := t.getFileURL(m.Voice.FileID)
+		msg.MediaType = "voice"
+		msg.MediaURL = url
+		msg.MediaSize = size
+	}
+	// Handle audio file
+	if m.Audio != nil {
+		url, size := t.getFileURL(m.Audio.FileID)
+		msg.MediaType = "audio"
+		msg.MediaURL = url
+		msg.MediaSize = size
+	}
+	// Handle video note (circular video)
+	if m.VideoNote != nil {
+		url, size := t.getFileURL(m.VideoNote.FileID)
+		msg.MediaType = "video_note"
+		msg.MediaURL = url
+		msg.MediaSize = size
 	}
 
 	return msg, true

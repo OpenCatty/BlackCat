@@ -112,6 +112,17 @@ skills:
   # Skills are loaded from this directory at startup
   dir: "skills/"
 
+# Whisper voice-to-text configuration (Groq API)
+# When enabled, voice/audio messages from Telegram, WhatsApp, and Discord
+# are automatically transcribed and processed as text.
+whisper:
+  enabled: false          # Enable Whisper transcription (default: false)
+  # API key for Groq (get one free at console.groq.com)
+  # Set via environment variable: BLACKCAT_WHISPER_GROQAPIKEY
+  groqApiKey: ""          # Set via env: BLACKCAT_WHISPER_GROQAPIKEY
+  model: "whisper-large-v3-turbo"  # Groq Whisper model
+  maxFileSizeMb: 25       # Max audio file size in MB (25 = free tier, 100 = dev tier)
+
 # Logging configuration
 logging:
   # Log level: "debug", "info", "warn", "error"
@@ -266,3 +277,31 @@ agent:
   ackMessage: "Baik, saya cek dulu..."
   language: "id"                  # Response language hint: "id" (Indonesian) or "en" (English)
   tone: "friendly"                # Communication tone: "friendly", "professional", "casual"
+
+# =============================================================================
+# Built-in Skill Environment Variables
+# =============================================================================
+# The following env vars are used by BlackCat's built-in social media skills.
+# Skills are silently skipped if their required env vars / binaries are missing.
+
+# Whisper voice transcription (Groq)
+# BLACKCAT_WHISPER_GROQAPIKEY=your-groq-api-key
+
+# Threads (Meta) — official Graph API
+# THREADS_ACCESS_TOKEN=your-threads-access-token
+
+# Twitter/X — requires: npm install -g @steipete/bird
+# TWITTER_AUTH_TOKEN=your-x-auth-token-cookie
+
+# LinkedIn — requires: pip install linkedin-api
+# LINKEDIN_LI_AT=your-li_at-cookie
+# LINKEDIN_JSESSIONID=your-jsessionid-cookie
+
+# Facebook Pages — official Graph API
+# FACEBOOK_PAGE_TOKEN=your-page-access-token
+
+# TikTok — official Content API
+# TIKTOK_ACCESS_TOKEN=your-tiktok-access-token
+
+# Google Workspace — requires: npm install -g @googleworkspace/cli (Node 18+)
+# (auth via: gws auth setup)

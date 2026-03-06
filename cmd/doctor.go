@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -148,6 +149,25 @@ var doctorCmd = &cobra.Command{
 			} else {
 				printFail("WhatsApp enabled but no session — run 'blackcat channels login --channel whatsapp'")
 				failed++
+			}
+		}
+
+		// Check 9: Node.js version (required for Google Workspace CLI and other npm-based tools).
+		nodeVersion, nodeErr := exec.Command("node", "--version").Output()
+		if nodeErr != nil {
+			printWarn("Node.js not found — Google Workspace CLI and npm-based skills unavailable")
+			fmt.Println("    Install Node.js 18+ from https://nodejs.org")
+			warned++
+		} else {
+			vStr := strings.TrimSpace(string(nodeVersion)) // e.g. "v20.11.0"
+			major := 0
+			fmt.Sscanf(vStr, "v%d.", &major)
+			if major < 18 {
+				printWarn(fmt.Sprintf("Node.js %s found but version 18+ required for npm-based skills", vStr))
+				warned++
+			} else {
+				printCheck(true, fmt.Sprintf("Node.js %s", vStr))
+				passed++
 			}
 		}
 

@@ -433,6 +433,15 @@ func convertEvent(evt *events.Message) (itypes.Message, bool) {
 		}
 	}
 
+	// Handle audio/voice messages — flag for downstream transcription
+	var audioMsg *waE2E.AudioMessage
+	if a := evt.Message.GetAudioMessage(); a != nil {
+		audioMsg = a
+		if text == "" {
+			text = "[Voice message received]"
+		}
+	}
+
 	if text == "" {
 		return itypes.Message{}, false
 	}
@@ -457,14 +466,26 @@ func convertEvent(evt *events.Message) (itypes.Message, bool) {
 		content = fmt.Sprintf("[Replying to: %s]\n\n%s", quotedText, text)
 	}
 
-	return itypes.Message{
+	msg := itypes.Message{
 		ID:          evt.Info.ID,
 		ChannelType: itypes.ChannelWhatsApp,
 		ChannelID:   evt.Info.Chat.String(),
 		UserID:      evt.Info.Sender.String(),
 		Content:     content,
 		Timestamp:   evt.Info.Timestamp,
-	}, true
+	}
+
+	// Enrich with audio metadata for downstream transcription.
+	if audioMsg != nil {
+		msg.MediaType = "voice"
+		if msg.Metadata == nil {
+			msg.Metadata = make(map[string]string)
+		}
+		msg.Metadata["wa_media_requires_download"] = "true"
+		msg.Metadata["wa_mimetype"] = audioMsg.GetMimetype()
+	}
+
+	return msg, true
 }
 
 // randomDelay returns a random duration between minMs and maxMs milliseconds.

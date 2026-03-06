@@ -21,6 +21,8 @@ Once summoned, the sorcery is autonomous: BlackCat handles LLM orchestration, to
 | 🧰 | **OpenCode Delegation** | Full access to OpenCode CLI for coding, debugging, refactoring |
 | 🔌 | **MCP Support** | Model Context Protocol server/client integration |
 | 🧹 | **Memory** | Persistent agent memory via MEMORY.md with auto-consolidation |
+| 🎙️ | **Voice Transcription** | Automatic voice-to-text via Groq Whisper for Telegram, Discord, WhatsApp |
+| 📱 | **Social Media Skills** | Built-in skills for Threads, Twitter/X, LinkedIn, Facebook, TikTok, Google Workspace |
 
 ## Supported Providers
 
@@ -84,9 +86,23 @@ BLACKCAT_CHANNELS_DISCORD_TOKEN=your-discord-token
 BLACKCAT_VAULT_PASSPHRASE=your-passphrase
 BLACKCAT_ZEN_APIKEY=your-zen-key
 BLACKCAT_OPENCODE_PASSWORD=your-opencode-password
+BLACKCAT_WHISPER_GROQAPIKEY=your-groq-api-key
 ```
 
 See [`blackcat.example.yaml`](blackcat.example.yaml) for the full reference.
+
+## Built-in Skills
+
+| Skill | Requires | Auth |
+|-------|----------|------|
+| Threads | `THREADS_ACCESS_TOKEN` | Meta Graph API token |
+| Twitter/X | `bird` CLI + `TWITTER_AUTH_TOKEN` | Browser cookie |
+| LinkedIn | `python3` + `linkedin-api` + `LINKEDIN_LI_AT` + `LINKEDIN_JSESSIONID` | Browser cookies |
+| Facebook | `FACEBOOK_PAGE_TOKEN` | Meta Graph API token |
+| TikTok | `TIKTOK_ACCESS_TOKEN` | TikTok Content API token |
+| Google Workspace | `gws` CLI (Node 18+) | `gws auth setup` |
+
+Skills are silently skipped when prerequisites are not met. Run `blackcat doctor` to check.
 
 ## Requirements
 
@@ -94,6 +110,8 @@ See [`blackcat.example.yaml`](blackcat.example.yaml) for the full reference.
 - [OpenCode CLI](https://opencode.ai) running on the same machine
 - At least one messaging channel configured
 - At least one LLM provider API key
+- Node.js 18+ (optional — required for Google Workspace CLI skill)
+- Python 3 (optional — required for LinkedIn skill)
 
 ## License
 
