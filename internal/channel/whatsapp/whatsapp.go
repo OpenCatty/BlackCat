@@ -166,6 +166,12 @@ func (w *WhatsAppChannel) Start(ctx context.Context) error {
 				slog.Info("whatsapp: online presence set")
 			}
 		case *events.Message:
+			// Skip messages sent by the bot's own account (e.g. user typing
+			// from the same phone to other contacts). Without this check the
+			// agent would process outgoing messages and reply to random people.
+			if v.Info.IsFromMe {
+				return
+			}
 			// Deduplicate: whatsmeow can fire the same event more than once.
 			dedupeKey := v.Info.Sender.String() + "|" + v.Info.ID
 			if w.dedup.check(dedupeKey) {
@@ -361,10 +367,10 @@ func (w *WhatsAppChannel) Health() itypes.ChannelHealth {
 	}
 
 	return itypes.ChannelHealth{
-			Name:    "whatsapp",
-			Healthy: true,
-			Details: "connected and responsive",
-		}
+		Name:    "whatsapp",
+		Healthy: true,
+		Details: "connected and responsive",
+	}
 }
 
 // Reconnect attempts to reconnect the WhatsApp client.
