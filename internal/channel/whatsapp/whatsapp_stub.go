@@ -42,11 +42,14 @@ func NewWhatsAppChannel(storePath string, allowFrom []string) *WhatsAppChannel {
 		ch.allowFrom = make(map[string]bool, len(allowFrom))
 		for _, phone := range allowFrom {
 			if phone == "*" {
-				ch.allowFrom = nil
+				ch.allowFrom = nil // wildcard = allow all
 				break
 			}
 			ch.allowFrom[normalizeE164(phone)] = true
 		}
+	} else {
+		// Empty allowFrom = deny all (secure by default)
+		ch.allowFrom = make(map[string]bool)
 	}
 	return ch
 }

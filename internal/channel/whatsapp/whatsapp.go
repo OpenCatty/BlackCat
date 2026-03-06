@@ -120,6 +120,9 @@ func NewWhatsAppChannel(storePath string, allowFrom []string) *WhatsAppChannel {
 			}
 			ch.allowFrom[normalizeE164(phone)] = true
 		}
+	} else {
+		// Empty allowFrom = deny all (secure by default)
+		ch.allowFrom = make(map[string]bool)
 	}
 	return ch
 }
