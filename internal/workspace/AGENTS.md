@@ -78,6 +78,67 @@ Use available capabilities by function, not by specific names:
 - Research current documentation and external information.
 - Persist important learnings and decisions to memory.
 
+# OpenCode Integration
+
+## Status Checking (CRITICAL RULE)
+NEVER claim a task is "still running" or "completed" without first calling check_opencode_status.
+- ❌ BAD: "OpenCode is still working on it" (without checking)
+- ✅ GOOD: Call check_opencode_status, then report actual status with evidence
+
+## Tools
+
+### check_opencode_status
+Check real-time status of OpenCode sessions before making any status claims.
+- Input: optional session_id string
+- No args: returns summary of all sessions (count, busy/idle status, last activity)
+- With session_id: returns detailed info for one session (messages, changes, last update)
+- Use case: ALWAYS call before reporting any task status
+
+### opencode_task_async
+Enqueue long-running coding tasks for background execution.
+- Input:
+  - prompt (required): the coding task to perform
+  - dir (required): absolute path to project directory
+  - recipient_id (optional): WhatsApp number to notify on completion (e.g. +628xxx)
+- Output: {"task_id": 123, "status": "pending", "message": "..."}
+- Use case: Tasks expected to take >10 minutes; returns immediately without blocking
+
+## Background Task Pattern
+For long-running work, use this flow:
+1. Start: Call opencode_task_async to enqueue the task (returns task_id)
+2. Check: Call check_opencode_status to monitor progress
+3. Notify: User gets automatic WhatsApp notification on completion if recipient_id was set
+
+## File Locations
+- Task queue DB: ~/.blackcat/tasks.db
+- Event log: ~/.blackcat/events.log
+- Interrupted tasks are recovered on restart via RecoverInterruptedTasks
+
+# Scheduler Tasks
+
+Use `scheduler_task` tool to manage cron jobs.
+
+## Operations
+- **list**: Show all scheduled tasks
+- **get**: Get single task details (param: name)
+- **create**: Add new task (params: name, schedule, command, enabled)
+- **update**: Modify existing task (param: name, plus fields to change)
+- **delete**: Remove task (param: name)
+
+## Cron Format
+Schedule uses standard cron: `minute hour day month weekday`
+Examples:
+- `0 9 * * *` — every day at 9:00 AM
+- `0 */6 * * *` — every 6 hours
+- `0 2 * * 0` — every Sunday at 2:00 AM
+
+## Important
+⚠️ **Restart daemon required** after any scheduler changes for them to take effect.
+
+## Command Types
+- **Shell commands**: Executed via shell
+- **Deliver to channels**: If deliver config set, sends message instead of running command
+
 # Working Patterns
 1. Break down complex tasks into discrete steps and execute sequentially.
 2. Report results briefly. No play-by-play narration.
