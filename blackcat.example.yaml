@@ -39,6 +39,11 @@ llm:
   temperature: 0.7
   # Maximum tokens per response
   maxTokens: 4096
+  # Fallback providers (tried in order if primary fails)
+  # Valid names: openai, copilot, antigravity, gemini, zen
+  # fallback:
+  #   - copilot
+  #   - gemini
 
 # Communication channels configuration
 channels:
@@ -115,6 +120,13 @@ skills:
   allow_external_install: false
   max_skills_in_prompt: 50
   max_skill_file_bytes: 262144
+  # Phase 3 skill frontmatter fields (in skill .md YAML front matter):
+  #   version: "v1.0.0"       # Semantic version (vMAJOR.MINOR.PATCH)
+  #   install: "pip install …" # Install hint shown by doctor for ineligible skills
+  #   depends_on: []          # Names of other skills this skill requires
+  #   requires:
+  #     any_bins:             # OR-within-group, AND-across-groups
+  #       - [python3, python]
 
 # Whisper voice-to-text configuration (Groq API)
 # When enabled, voice/audio messages from Telegram, WhatsApp, and Discord
@@ -126,6 +138,14 @@ whisper:
   groqApiKey: ""          # Set via env: BLACKCAT_WHISPER_GROQAPIKEY
   model: "whisper-large-v3-turbo"  # Groq Whisper model
   maxFileSizeMb: 25       # Max audio file size in MB (25 = free tier, 100 = dev tier)
+
+# Budget controls for LLM API spending
+# When enabled, the daemon checks estimated spend before processing each request.
+# budget:
+#   enabled: false              # Enable budget enforcement (default: false)
+#   daily_limit_usd: 10.00     # Daily spend limit in USD (0 = unlimited)
+#   monthly_limit_usd: 100.00  # Monthly spend limit in USD (0 = unlimited)
+#   warn_threshold: 0.8        # Fraction of limit at which warnings are emitted (default: 0.8)
 
 # Logging configuration
 logging:

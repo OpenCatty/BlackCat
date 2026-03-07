@@ -167,3 +167,66 @@ The following additional built-in skills are available when prerequisites are me
 - Both built-in skills dir and marketplace dir are watched for live reload
 - Skills exceeding MaxSkillFileBytes are silently skipped
 - Skills are deduplicated by name across directories (built-in wins on conflict)
+
+## Phase 3 Features
+
+### Provider Fallback
+- Config: llm.fallback ([]string, default empty)
+- Valid provider names: openai, copilot, antigravity, gemini, zen
+- Behavior: if primary provider fails, fallback providers are tried in order
+- ErrContextLength is NOT retried via fallback — returned immediately to caller
+- Per-provider retry: 3 attempts before moving to next fallback
+- If all fallbacks fail, returns joined error from all providers
+- Zero-value (empty fallback list) preserves existing behavior exactly
+
+### Budget Controls
+- Config section: budget.*
+- budget.enabled (bool, default false): master switch for budget enforcement
+- budget.daily_limit_usd (float64, default 0 = unlimited): daily spend cap in USD
+- budget.monthly_limit_usd (float64, default 0 = unlimited): monthly spend cap in USD
+- budget.warn_threshold (float64, default 0.8): fraction of limit at which warnings are emitted
+- Pricing model: flat rates — $2.00/M input tokens, $8.00/M output tokens (no per-model pricing)
+- BudgetExceeded status: request rejected, user notified via channel
+- BudgetWarning status: slog.Warn emitted, processing continues
+- Budget check runs BEFORE each message is processed; read-only (no DB writes on check)
+
+### Skill Versioning
+- Frontmatter field: version (string, optional) — must be vMAJOR.MINOR.PATCH semver
+- ValidateVersion() uses golang.org/x/mod/semver.Canonical for validation
+- Empty version string is valid (unversioned skill)
+
+### Skill Dependencies
+- Frontmatter field: depends_on ([]string, optional) — list of skill names
+- Dependency resolution: Kahn's algorithm (topological sort), deterministic (alphabetical tie-breaking)
+- Missing dependency: skill silently removed (graceful degradation, not error)
+- Circular dependency: detected via DFS, logged as error, original eligible list returned unchanged
+
+### Skill Install Hints
+- Frontmatter field: install (string, optional) — install command hint for ineligible skills
+- install field is NEVER exposed in FormatForInjection() output (runtime only)
+- Shown by blackcat doctor Check 15 for ineligible skills that have an install hint
+
+### Flexible Prerequisites (anyBins)
+- Frontmatter field: requires.any_bins ([][]string, optional) — list of binary groups
+- Within each group: OR semantics (any binary in the group satisfies the group)
+- Across groups: AND semantics (all groups must be satisfied)
+- Example: [[python3, python], [node, nodejs]] = (python3 OR python) AND (node OR nodejs)
+- Empty any_bins: always satisfied (no constraint)
+- getBinaryVersion(name) utility: probes --version/-v/version flags, extracts semver from output
+
+### Marketplace Registry
+- File: registry.json in marketplace directory (skills.marketplace_dir)
+- Schema: {"skills": [{"name":"...","version":"...","description":"...","install":"...","author":"...","license":"..."}]}
+- LoadRegistry(marketplaceDir): returns empty Registry (not error) when registry.json absent
+- InstalledStatus(loaded []Skill): compares registry versions against loaded skills
+- Statuses: "not-installed", "installed", "update-available"
+- Version comparison uses ValidateVersion() canonical form
+- Empty versions (either registry or installed): reports "installed" without version comparison
+
+## Do / Don't (Phase 3 additions)
+- DO configure llm.fallback for resilience against provider outages
+- DO set budget limits in production deployments (budget.enabled: true)
+- DON'T use fallback with antigravity as primary — requires special ToS config not supported in fallback chain
+- DO use version field in marketplace skills for update-available detection
+- DON'T expect install hint to appear in the LLM context — it is doctor-only
+- DO run blackcat doctor after adding new marketplace skills to verify eligibility

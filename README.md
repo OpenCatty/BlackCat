@@ -148,6 +148,65 @@ npx blackcat-skill install <skill-name>
 - Node.js 18+ (optional — required for Google Workspace CLI skill)
 - Python 3 (optional — required for LinkedIn skill)
 
+## Phase 3 Features
+
+### Provider Fallback
+
+Configure backup LLM providers that are tried in order if the primary fails:
+
+```yaml
+llm:
+  provider: openai
+  fallback:
+    - copilot
+    - gemini
+```
+
+Valid fallback names: `openai`, `copilot`, `antigravity`, `gemini`, `zen`.
+
+### Budget Controls
+
+Set daily and monthly spend limits to prevent runaway API costs:
+
+```yaml
+budget:
+  enabled: true
+  daily_limit_usd: 10.00
+  monthly_limit_usd: 100.00
+  warn_threshold: 0.8
+```
+
+When a limit is exceeded, the daemon rejects the request and informs the user. At the warn threshold, a warning is logged and processing continues.
+
+### Skill Versioning and Dependencies
+
+Skills can declare a semantic version and depend on other skills:
+
+```yaml
+# In skill frontmatter
+version: "v1.2.0"
+depends_on:
+  - coding
+  - research
+```
+
+Skills are loaded in dependency order (topological sort). Circular dependencies are detected and rejected. Missing dependencies are logged and the dependent skill is removed.
+
+### Flexible Prerequisites (anyBins)
+
+Skills can declare flexible binary requirements using OR logic within groups:
+
+```yaml
+requires:
+  any_bins:
+    - [python3, python]   # either python3 or python satisfies this group
+    - [node, nodejs]      # AND either node or nodejs
+```
+
+### Marketplace Registry
+
+A `registry.json` file in the marketplace directory describes available skills with version and install metadata. Run `blackcat doctor` to check registry status and skill install hints.
+
 ## License
 
 See [LICENSE](LICENSE) for details.

@@ -26,6 +26,7 @@ type Config struct {
 	Agent        AgentConfig        `yaml:"agent"`        // Agent persona and personalization settings
 	RateLimit    RateLimitConfig    `yaml:"rateLimit"`    // Per-user rate limiting
 	Whisper      WhisperConfig      `yaml:"whisper"`      // Groq Whisper voice-to-text configuration
+	Budget       BudgetConfig       `yaml:"budget"`       // Per-user spend limits
 
 }
 
@@ -44,13 +45,14 @@ type OpenCodeConfig struct {
 
 // LLMConfig holds LLM provider settings.
 type LLMConfig struct {
-	Provider         string  `yaml:"provider"`         // e.g., "openai", "claude", "ollama"
-	Model            string  `yaml:"model"`            // e.g., "gpt-4", "claude-3-opus"
-	APIKey           string  `yaml:"apiKey"`           // Set via env or vault
-	BaseURL          string  `yaml:"baseURL"`          // Optional: custom base URL
-	Temperature      float64 `yaml:"temperature"`      // 0.0 to 2.0
-	MaxTokens        int     `yaml:"maxTokens"`        // Max tokens per response
-	MaxContextTokens int     `yaml:"maxContextTokens"` // Max context window tokens (0 = disabled, default 80000)
+	Provider         string   `yaml:"provider"`         // e.g., "openai", "claude", "ollama"
+	Model            string   `yaml:"model"`            // e.g., "gpt-4", "claude-3-opus"
+	APIKey           string   `yaml:"apiKey"`           // Set via env or vault
+	BaseURL          string   `yaml:"baseURL"`          // Optional: custom base URL
+	Temperature      float64  `yaml:"temperature"`      // 0.0 to 2.0
+	MaxTokens        int      `yaml:"maxTokens"`        // Max tokens per response
+	MaxContextTokens int      `yaml:"maxContextTokens"` // Max context window tokens (0 = disabled, default 80000)
+	Fallback         []string `yaml:"fallback"`         // Fallback model chain
 }
 
 // ChannelsConfig holds communication channel settings.
@@ -321,6 +323,14 @@ type RateLimitConfig struct {
 	WindowSeconds int  `yaml:"windowSeconds"` // Window size in seconds (default 60)
 }
 
+// BudgetConfig holds per-user spend limits.
+type BudgetConfig struct {
+	Enabled         bool    `yaml:"enabled"`
+	DailyLimitUSD   float64 `yaml:"daily_limit_usd"`
+	MonthlyLimitUSD float64 `yaml:"monthly_limit_usd"`
+	WarnThreshold   float64 `yaml:"warn_threshold"` // 0.0-1.0, default 0.8
+}
+
 // Validate applies defaults and enforces constraints on the Config.
 func (c *Config) Validate() {
 	// Dashboard defaults
@@ -391,5 +401,10 @@ func (c *Config) Validate() {
 	}
 	if c.Skills.MaxSkillFileBytes == 0 {
 		c.Skills.MaxSkillFileBytes = 262144
+	}
+
+	// Budget defaults
+	if c.Budget.Enabled && c.Budget.WarnThreshold == 0 {
+		c.Budget.WarnThreshold = 0.8
 	}
 }

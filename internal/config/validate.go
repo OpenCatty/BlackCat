@@ -33,6 +33,18 @@ func ValidateDeep(c *Config) error {
 		}
 	}
 
+	if c.Budget.Enabled {
+		if c.Budget.DailyLimitUSD < 0 {
+			errs = append(errs, fmt.Errorf("budget.daily_limit_usd must be >= 0"))
+		}
+		if c.Budget.MonthlyLimitUSD < 0 {
+			errs = append(errs, fmt.Errorf("budget.monthly_limit_usd must be >= 0"))
+		}
+		if c.Budget.WarnThreshold < 0 || c.Budget.WarnThreshold > 1 {
+			errs = append(errs, fmt.Errorf("budget.warn_threshold must be between 0 and 1"))
+		}
+	}
+
 	for i, job := range c.Scheduler.Jobs {
 		if job.Enabled {
 			if job.Name == "" {

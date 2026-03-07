@@ -658,6 +658,7 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 					ChannelID:   m.ChannelID,
 					UserID:      m.UserID, // E3: empty UserID → channelID-only key handled by SessionKey.String()
 				}
+				loopCfg.SessionID = key.String()
 				if sessionStore != nil {
 					sess, sessErr := sessionStore.Get(key)
 					if sessErr != nil {
@@ -672,6 +673,29 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 							history = append(history, types.LLMMessage{Role: msg.Role, Content: msg.Content})
 						}
 						loopCfg.SessionMessages = history
+					}
+				}
+
+				// Budget check
+				if costTracker != nil && cfg.Budget.Enabled {
+					budgetResult, budgetErr := costTracker.CheckBudget(ctx, loopCfg.UserID, cfg.Budget)
+					if budgetErr != nil {
+						slog.Warn("budget check failed", "err", budgetErr)
+					} else if budgetResult.Status == observability.BudgetExceeded {
+						reply := types.Message{
+							ID:          fmt.Sprintf("budget-%s", m.ID),
+							ChannelType: m.ChannelType,
+							ChannelID:   m.ChannelID,
+							ReplyTo:     m.ID,
+							Timestamp:   time.Now(),
+							Content:     "⚠️ Budget limit exceeded: " + budgetResult.Message,
+						}
+						sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+						defer cancel()
+						_ = bus.Send(sendCtx, m.ChannelType, reply)
+						return
+					} else if budgetResult.Status == observability.BudgetWarning {
+						slog.Warn("budget warning", "user", loopCfg.UserID, "message", budgetResult.Message)
 					}
 				}
 
@@ -1036,9 +1060,9 @@ func (a backendAdapter) Stream(ctx context.Context, messages []types.LLMMessage,
 	return a.backend.Stream(ctx, messages, tools)
 }
 
-// createActiveBackend returns the first enabled Phase 2 backend from config.
+// createSingleBackend returns the first enabled Phase 2 backend from config.
 // Returns (nil, "") if no Phase 2 providers are enabled.
-func createActiveBackend(cfg *config.Config) (llm.Backend, string) {
+func createSingleBackend(cfg *config.Config) (llm.Backend, string) {
 	// OpenAI / Codex (API key from config or vault)
 	if cfg.Providers.OpenAI.Enabled {
 		apiKey := cfg.Providers.OpenAI.APIKey
@@ -1122,6 +1146,86 @@ func createActiveBackend(cfg *config.Config) (llm.Backend, string) {
 	}
 
 	return nil, ""
+}
+
+// createBackendByName creates a backend for a specific named provider using the backend registry.
+// Only works for providers registered via llm.RegisterBackend: "openai", "copilot", "gemini", "zen".
+// Antigravity uses special OAuth config and is NOT supported here.
+func createBackendByName(cfg *config.Config, name string) (llm.Backend, error) {
+	switch name {
+	case "openai":
+		return llm.CreateBackend("openai", llm.BackendConfig{
+			APIKey:  cfg.Providers.OpenAI.APIKey,
+			BaseURL: cfg.Providers.OpenAI.BaseURL,
+			Model:   cfg.Providers.OpenAI.Model,
+		})
+	case "copilot":
+		tokenSource := vaultTokenSource("oauth.copilot")
+		return llm.CreateBackend("copilot", llm.BackendConfig{
+			TokenSource: tokenSource,
+			Model:       cfg.Providers.Copilot.Model,
+		})
+	case "gemini":
+		return llm.CreateBackend("gemini", llm.BackendConfig{
+			APIKey: cfg.Providers.Gemini.APIKey,
+			Model:  cfg.Providers.Gemini.Model,
+		})
+	case "zen":
+		apiKey := cfg.Zen.APIKey
+		model := cfg.Providers.Zen.Model
+		if model == "" && len(cfg.Zen.Models) > 0 {
+			model = cfg.Zen.Models[0]
+		}
+		return llm.CreateBackend("zen", llm.BackendConfig{
+			APIKey:  apiKey,
+			BaseURL: cfg.Zen.BaseURL,
+			Model:   model,
+		})
+	default:
+		return nil, fmt.Errorf("createBackendByName: unsupported provider %q (try openai, copilot, gemini, zen)", name)
+	}
+}
+
+// createActiveBackend returns the active backend, optionally wrapped in a FallbackBackend
+// if cfg.LLM.Fallback is non-empty. Returns (nil, "") if no provider is enabled.
+func createActiveBackend(cfg *config.Config) (llm.Backend, string) {
+	primary, primaryName := createSingleBackend(cfg)
+	if primary == nil {
+		return nil, ""
+	}
+
+	// No fallback configured — return primary directly (existing behavior)
+	if len(cfg.LLM.Fallback) == 0 {
+		return primary, primaryName
+	}
+
+	// Build fallback chain
+	backends := []llm.Backend{primary}
+	names := []string{primaryName}
+	for _, name := range cfg.LLM.Fallback {
+		fb, err := createBackendByName(cfg, name)
+		if err != nil {
+			slog.Warn("fallback provider skipped", "provider", name, "err", err)
+			continue
+		}
+		backends = append(backends, fb)
+		names = append(names, name)
+	}
+
+	// If only primary (all fallbacks failed to init), return primary as-is
+	if len(backends) == 1 {
+		return primary, primaryName
+	}
+
+	fallbackBackend, err := llm.NewFallbackBackend(backends, names)
+	if err != nil {
+		slog.Warn("fallback backend creation failed, using primary only", "err", err)
+		return primary, primaryName
+	}
+
+	slog.Info("fallback chain configured", "primary", primaryName, "fallbacks", names[1:])
+	// Return the FallbackBackend with a composite name
+	return fallbackBackend, primaryName
 }
 
 // vaultTokenSource creates a TokenSource that reads an OAuth token from the vault.

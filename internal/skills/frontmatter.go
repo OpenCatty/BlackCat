@@ -16,8 +16,9 @@ type MCPConfig struct {
 
 // Requirements represents required binaries and environment variables
 type Requirements struct {
-	Bins []string `yaml:"bins"` // required binaries on PATH
-	Env  []string `yaml:"env"`  // required environment variables
+	Bins    []string   `yaml:"bins"`     // required binaries on PATH
+	Env     []string   `yaml:"env"`      // required environment variables
+	AnyBins [][]string `yaml:"any_bins"` // each inner slice is an OR group; all groups are AND-ed
 }
 
 // FrontmatterData represents YAML frontmatter metadata in a skill file
@@ -27,6 +28,9 @@ type FrontmatterData struct {
 	MCP         map[string]MCPConfig `yaml:"mcp"`
 	Tags        []string             `yaml:"tags"`
 	Requires    Requirements         `yaml:"requires"`
+	Version     string               `yaml:"version"`
+	Install     string               `yaml:"install"`
+	DependsOn   []string             `yaml:"depends_on"`
 }
 
 // ParseFrontmatter parses YAML frontmatter from skill content.
