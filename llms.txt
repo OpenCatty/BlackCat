@@ -97,6 +97,25 @@ BlackCat ships with built-in skills for social media and productivity. Skills ar
 
 Run `blackcat doctor` to verify skill prerequisites.
 
+### Voice Transcription (Whisper)
+
+Enable voice-to-text transcription for Telegram, Discord, and WhatsApp voice messages.
+
+**How to enable:**
+1. Set `whisper.enabled: true` in `~/.blackcat/config.yaml`
+2. Set the environment variable: `BLACKCAT_WHISPER_GROQAPIKEY=<your-groq-api-key>`
+
+**Full config example:**
+```yaml
+whisper:
+  enabled: true
+  model: whisper-large-v3-turbo   # recommended
+```
+
+**Where to get the key:** https://console.groq.com → API Keys
+
+**Verify with:** `blackcat doctor` — shows "Voice Transcription" check as pass/fail
+
 ## Scheduler Configuration
 
 Configured in `~/.blackcat/config.yaml` under the `scheduler:` section.
@@ -231,6 +250,14 @@ The following additional built-in skills are available when prerequisites are me
 - DON'T expect install hint to appear in the LLM context — it is doctor-only
 - DO run blackcat doctor after adding new marketplace skills to verify eligibility
 
+## v1.3.1 Fixes and Additions
+
+1. **Config auto-load fix**: `blackcat doctor` and all commands now correctly load `~/.blackcat/config.yaml` (previously looked for `~/.blackcat.yaml` — missing the subdirectory). No user action required; this is transparent.
+
+2. **Extended `blackcat doctor` skill checks**: Doctor now checks 14 additional skills beyond the 7 social media skills: Voice Transcription (Whisper), and Phase 2 skills (veo3-video-gen, nano-banana-pro, document-processing, capability-evolver, reddit-scraper, prompt-guard, marketplace-installer). Doctor also shows install hints for ineligible skills that have an `install` field in their frontmatter.
+
+3. **`blackcat onboard` Step 5 — Skills setup**: The onboard wizard now has a 5th step (relabeled from 4-step to 5-step flow) that interactively walks users through setting up built-in skills. For each skill, it shows prerequisites and provides setup instructions. Users can skip or configure each skill individually.
+
 ## Role-Based Routing (Phase 4)
 
 ### How ClassifyMessage Works
@@ -243,12 +270,12 @@ The following additional built-in skills are available when prerequisites are me
 
 | Role | Priority | Domain |
 |------|----------|--------|
-| phantom | 10 | Research, information gathering, web search |
-| astrology | 20 | Analysis, predictions, pattern recognition |
+| phantom | 10 | Infrastructure and DevOps automation |
+| astrology | 20 | Cryptocurrency and Web3 |
 | wizard | 30 | Coding, software development, architecture |
 | artist | 40 | Creative work, design, visual tasks |
 | scribe | 50 | Documentation, writing, note-taking |
-| explorer | 60 | System navigation, file exploration, discovery |
+| explorer | 60 | Research, information gathering, web search |
 | oracle | 100 | General fallback, complex reasoning, orchestration |
 
 ### Configuring Custom Roles
@@ -281,6 +308,40 @@ roles:
 - `keywords` ([]string): Trigger words that route messages to this role
 - `allowed_tools` ([]string): Tool names this role can invoke (empty = all tools)
 - `priority` (int): Lower number = higher priority (default: 100)
+
+### Per-Role Model and Provider Setup
+
+Configure different LLM models and providers for each role.
+
+**Important:** There is **NO CLI command** for per-role model/provider configuration. It is YAML-only.
+
+**Configuration:**
+1. Edit `~/.blackcat/config.yaml` under the `roles:` section
+2. The config watcher **hot-reloads** automatically — no `blackcat restart` needed after saving
+3. Each role supports these override fields: `model`, `provider`, `temperature`, `system_prompt`
+
+**Example — different roles using different models/providers:**
+```yaml
+roles:
+  - name: phantom
+    priority: 10
+    model: "gpt-4.1-mini"         # fast, tool-focused for infra tasks
+    provider: "openai"
+    keywords: [deploy, docker, k8s, server, systemd]
+  - name: wizard
+    priority: 30
+    model: "claude-sonnet-4-5"    # deep reasoning for coding
+    provider: "anthropic"
+    temperature: 0.2
+    keywords: [code, refactor, debug, build]
+  - name: artist
+    priority: 40
+    model: "gemini-2.0-flash"     # fast and cheap for creative tasks
+    provider: "gemini"
+    keywords: [post, tweet, thread, image]
+```
+
+**Verify with:** `blackcat doctor` — shows active role count and configuration
 
 ## RTK Integration (Phase 4)
 
