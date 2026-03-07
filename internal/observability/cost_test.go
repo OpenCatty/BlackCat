@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/startower-observability/blackcat/internal/config"
 )
 
 func newTestDB(t *testing.T) *sql.DB {
@@ -201,4 +202,200 @@ func TestCostTracker_EstimatedCost(t *testing.T) {
 	if cost < expectedCost-0.01 || cost > expectedCost+0.01 {
 		t.Errorf("estimated cost = %f, want ~%f", cost, expectedCost)
 	}
+}
+
+func TestCheckBudget(t *testing.T) {
+	db := newTestDB(t)
+	ct, err := NewCostTracker(db)
+	if err != nil {
+		t.Fatalf("NewCostTracker: %v", err)
+	}
+	ctx := context.Background()
+
+	// Helper to insert usage using default pricing (input $2/M, output $8/M)
+	insertUsage := func(userID string, inputTokens, outputTokens int) {
+		t.Helper()
+		if err := ct.Record(ctx, userID, "sess1", "gpt-4o", "openai", inputTokens, outputTokens); err != nil {
+			t.Fatalf("Record: %v", err)
+		}
+	}
+
+	// Helper to calculate output tokens needed for a dollar amount at default pricing
+	// defaultOutputPricePerM = $8.00, so outputTokens = dollars / 8.00 * 1_000_000 = dollars * 125_000
+	outputTokensForDollars := func(dollars float64) int {
+		return int(dollars * 125_000)
+	}
+
+	t.Run("Disabled", func(t *testing.T) {
+		cfg := config.BudgetConfig{Enabled: false, DailyLimitUSD: 1.00}
+		result, err := ct.CheckBudget(ctx, "user_disabled", cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetOK {
+			t.Errorf("Status = %d, want BudgetOK (%d)", result.Status, BudgetOK)
+		}
+	})
+
+	t.Run("UnderLimit", func(t *testing.T) {
+		userID := "user_under"
+		// Insert $8 spend (1M output tokens at $8/M = $8)
+		insertUsage(userID, 0, outputTokensForDollars(8))
+
+		cfg := config.BudgetConfig{
+			Enabled:         true,
+			DailyLimitUSD:   100,
+			MonthlyLimitUSD: 1000,
+			WarnThreshold:   0.8,
+		}
+		result, err := ct.CheckBudget(ctx, userID, cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetOK {
+			t.Errorf("Status = %d, want BudgetOK (%d)", result.Status, BudgetOK)
+		}
+	})
+
+	t.Run("Warning", func(t *testing.T) {
+		userID := "user_warn"
+		// Insert $82 spend to be above 80% of $100 daily limit but below $100
+		// 82 / 8.00 * 1M = 10.25M output tokens
+		insertUsage(userID, 0, outputTokensForDollars(82))
+
+		cfg := config.BudgetConfig{
+			Enabled:         true,
+			DailyLimitUSD:   100,
+			MonthlyLimitUSD: 1000,
+			WarnThreshold:   0.8,
+		}
+		result, err := ct.CheckBudget(ctx, userID, cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetWarning {
+			t.Errorf("Status = %d, want BudgetWarning (%d)", result.Status, BudgetWarning)
+		}
+		if result.DailySpend < 80 || result.DailySpend > 85 {
+			t.Errorf("DailySpend = %f, want ~82", result.DailySpend)
+		}
+	})
+
+	t.Run("Exceeded", func(t *testing.T) {
+		userID := "user_exceeded"
+		// Insert $110 spend to exceed $100 daily limit
+		insertUsage(userID, 0, outputTokensForDollars(110))
+
+		cfg := config.BudgetConfig{
+			Enabled:         true,
+			DailyLimitUSD:   100,
+			MonthlyLimitUSD: 1000,
+			WarnThreshold:   0.8,
+		}
+		result, err := ct.CheckBudget(ctx, userID, cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetExceeded {
+			t.Errorf("Status = %d, want BudgetExceeded (%d)", result.Status, BudgetExceeded)
+		}
+	})
+
+	t.Run("DailyAndMonthly", func(t *testing.T) {
+		userID := "user_both"
+		// Insert $50 spend
+		insertUsage(userID, 0, outputTokensForDollars(50))
+
+		cfg := config.BudgetConfig{
+			Enabled:         true,
+			DailyLimitUSD:   100,
+			MonthlyLimitUSD: 500,
+			WarnThreshold:   0.8,
+		}
+		result, err := ct.CheckBudget(ctx, userID, cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetOK {
+			t.Errorf("Status = %d, want BudgetOK (%d)", result.Status, BudgetOK)
+		}
+		// Verify both daily and monthly spend are populated
+		if result.DailySpend == 0 {
+			t.Errorf("DailySpend should be populated, got %f", result.DailySpend)
+		}
+		if result.MonthlySpend == 0 {
+			t.Errorf("MonthlySpend should be populated, got %f", result.MonthlySpend)
+		}
+		if result.DailyLimit != 100 {
+			t.Errorf("DailyLimit = %f, want 100", result.DailyLimit)
+		}
+		if result.MonthlyLimit != 500 {
+			t.Errorf("MonthlyLimit = %f, want 500", result.MonthlyLimit)
+		}
+	})
+
+	t.Run("ZeroLimit", func(t *testing.T) {
+		userID := "user_zero"
+		// Insert large usage
+		insertUsage(userID, 0, outputTokensForDollars(500))
+
+		// Zero limits = unlimited
+		cfg := config.BudgetConfig{
+			Enabled:         true,
+			DailyLimitUSD:   0,
+			MonthlyLimitUSD: 0,
+			WarnThreshold:   0.8,
+		}
+		result, err := ct.CheckBudget(ctx, userID, cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetOK {
+			t.Errorf("Status = %d, want BudgetOK (%d) with unlimited limits", result.Status, BudgetOK)
+		}
+	})
+
+	t.Run("DailyEmpty", func(t *testing.T) {
+		userID := "user_empty"
+		// No usage records at all
+		cfg := config.BudgetConfig{
+			Enabled:         true,
+			DailyLimitUSD:   100,
+			MonthlyLimitUSD: 1000,
+			WarnThreshold:   0.8,
+		}
+		result, err := ct.CheckBudget(ctx, userID, cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetOK {
+			t.Errorf("Status = %d, want BudgetOK (%d) for empty usage", result.Status, BudgetOK)
+		}
+		if result.DailySpend != 0 {
+			t.Errorf("DailySpend = %f, want 0 for empty usage", result.DailySpend)
+		}
+	})
+
+	t.Run("MonthlyBoundary", func(t *testing.T) {
+		userID := "user_monthly_warn"
+		// Insert usage at exactly 90% of $100 monthly limit = $90
+		insertUsage(userID, 0, outputTokensForDollars(90))
+
+		cfg := config.BudgetConfig{
+			Enabled:         true,
+			DailyLimitUSD:   0, // unlimited daily
+			MonthlyLimitUSD: 100,
+			WarnThreshold:   0.9,
+		}
+		result, err := ct.CheckBudget(ctx, userID, cfg)
+		if err != nil {
+			t.Fatalf("CheckBudget: %v", err)
+		}
+		if result.Status != BudgetWarning {
+			t.Errorf("Status = %d, want BudgetWarning (%d) at 90%% threshold", result.Status, BudgetWarning)
+		}
+		if result.MonthlySpend < 85 || result.MonthlySpend > 95 {
+			t.Errorf("MonthlySpend = %f, want ~90", result.MonthlySpend)
+		}
+	})
 }

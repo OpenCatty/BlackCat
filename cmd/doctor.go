@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/startower-observability/blackcat/internal/service"
+	"github.com/startower-observability/blackcat/internal/skills"
 )
 
 var doctorFix bool
@@ -195,6 +196,79 @@ var doctorCmd = &cobra.Command{
 				failed++
 			} else {
 				printCheck(true, "npx available for marketplace skill installation")
+				passed++
+			}
+		}
+
+		// Check 12: Provider fallback configuration.
+		validProviders := map[string]bool{"openai": true, "copilot": true, "antigravity": true, "gemini": true, "zen": true}
+		fallbacks := viper.GetStringSlice("llm.fallback")
+		if len(fallbacks) == 0 {
+			printWarn("No fallback LLM providers configured (llm.fallback is empty) — single point of failure")
+			warned++
+		} else {
+			allValid := true
+			for _, fb := range fallbacks {
+				if !validProviders[fb] {
+					printFail(fmt.Sprintf("Invalid fallback provider %q in llm.fallback — valid: openai, copilot, antigravity, gemini, zen", fb))
+					failed++
+					allValid = false
+				}
+			}
+			if allValid {
+				printCheck(true, fmt.Sprintf("Fallback providers configured: %s", strings.Join(fallbacks, ", ")))
+				passed++
+			}
+		}
+
+		// Check 13: Budget configuration.
+		if viper.GetBool("budget.enabled") {
+			daily := viper.GetFloat64("budget.daily_limit_usd")
+			monthly := viper.GetFloat64("budget.monthly_limit_usd")
+			if daily <= 0 && monthly <= 0 {
+				printWarn("Budget enabled but no limits set (budget.daily_limit_usd and budget.monthly_limit_usd are both 0)")
+				warned++
+			} else {
+				printCheck(true, fmt.Sprintf("Budget controls active (daily: $%.2f, monthly: $%.2f)", daily, monthly))
+				passed++
+			}
+		} else {
+			printWarn("Budget controls disabled — no spend limits enforced (set budget.enabled: true to enable)")
+			warned++
+		}
+
+		// Check 14: Marketplace registry.
+		marketplacePath := viper.GetString("skills.marketplace_dir")
+		if marketplacePath == "" {
+			marketplacePath = "marketplace"
+		}
+		fullMarketplacePath14 := filepath.Join(home, ".blackcat", marketplacePath)
+		registryPath := filepath.Join(fullMarketplacePath14, "registry.json")
+		if _, err := os.Stat(registryPath); err == nil {
+			printCheck(true, fmt.Sprintf("Marketplace registry found (%s)", registryPath))
+			passed++
+		} else {
+			printWarn(fmt.Sprintf("No marketplace registry found at %s — skills marketplace not initialized", registryPath))
+			warned++
+		}
+
+		// Check 15: Skill install hints for ineligible skills.
+		skillsDir := viper.GetString("skills.dir")
+		if skillsDir == "" {
+			skillsDir = "skills/"
+		}
+		fullSkillsDir := filepath.Join(home, ".blackcat", skillsDir)
+		if loadedSkills, err := skills.LoadSkills(fullSkillsDir); err == nil {
+			hints := 0
+			for _, sk := range loadedSkills {
+				if !sk.IsEligible() && sk.Install != "" {
+					printWarn(fmt.Sprintf("Skill %q not eligible — install hint: %s", sk.Name, sk.Install))
+					warned++
+					hints++
+				}
+			}
+			if hints == 0 {
+				printCheck(true, fmt.Sprintf("All %d loaded skills are eligible", len(loadedSkills)))
 				passed++
 			}
 		}

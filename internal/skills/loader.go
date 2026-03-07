@@ -1,12 +1,18 @@
 package skills
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"time"
+
+	"golang.org/x/mod/semver"
 )
 
 // Skill represents a skill loaded from a markdown file
@@ -16,6 +22,25 @@ type Skill struct {
 	Tags     []string
 	FilePath string
 	Requires Requirements
+
+	// Phase 3 fields
+	Version   string     `json:"version,omitempty"`
+	Install   string     `json:"-"` // intentionally excluded from serialization
+	DependsOn []string   `json:"depends_on,omitempty"`
+	AnyBins   [][]string `json:"-"` // runtime only
+}
+
+// ValidateVersion checks that v is a valid semantic version (e.g. "v1.2.3").
+// Returns the canonical form or an error.
+func ValidateVersion(v string) (string, error) {
+	if v == "" {
+		return "", nil
+	}
+	canonical := semver.Canonical(v)
+	if canonical == "" {
+		return "", fmt.Errorf("invalid semver %q: must be in vMAJOR.MINOR.PATCH form", v)
+	}
+	return canonical, nil
 }
 
 // IsEligible checks if a skill's requirements are met.
@@ -31,7 +56,53 @@ func (s *Skill) IsEligible() bool {
 			return false
 		}
 	}
+	if !checkAnyBins(s.AnyBins) {
+		return false
+	}
 	return true
+}
+
+// checkAnyBins returns true if every group in anyBins has at least one binary found on PATH.
+// Each inner slice is an OR-group: at least one binary from the group must exist.
+// Groups are AND-ed: ALL groups must be satisfied.
+// Empty anyBins (nil or length 0) returns true.
+func checkAnyBins(anyBins [][]string) bool {
+	for _, group := range anyBins {
+		found := false
+		for _, bin := range group {
+			if _, err := exec.LookPath(bin); err == nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// getBinaryVersion tries to get the version string of a binary by running common version flags.
+// Returns the first semver-like string found, or empty string if not found or binary not on PATH.
+// Uses a 3-second timeout.
+func getBinaryVersion(bin string) string {
+	if _, err := exec.LookPath(bin); err != nil {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	for _, flag := range []string{"--version", "-v", "version"} {
+		out, err := exec.CommandContext(ctx, bin, flag).CombinedOutput()
+		if err != nil {
+			continue
+		}
+		// Look for semver-like pattern (vX.Y.Z or X.Y.Z)
+		re := regexp.MustCompile(`v?\d+\.\d+\.\d+`)
+		if m := re.FindString(string(out)); m != "" {
+			return m
+		}
+	}
+	return ""
 }
 
 // LoadSkills loads all .md files from a directory and parses them as skills
@@ -105,6 +176,10 @@ func parseSkillFile(content string, filePath string, filename string) Skill {
 			skill.Tags = fm.Tags
 		}
 		skill.Requires = fm.Requires
+		skill.Version = fm.Version
+		skill.Install = fm.Install
+		skill.DependsOn = fm.DependsOn
+		skill.AnyBins = fm.Requires.AnyBins
 		skill.Content = body
 
 		// If name not set from frontmatter, fall through to header parsing
@@ -214,7 +289,12 @@ func LoadSkillsFromMultipleSources(dirs []string) ([]Skill, error) {
 			}
 		}
 	}
-	return all, nil
+	sorted, err := ResolveDependencies(all)
+	if err != nil {
+		log.Printf("skills: dependency resolution warning: %v; loading without dependency order", err)
+		return all, nil
+	}
+	return sorted, nil
 }
 
 // FormatForInjection formats skills as context blocks for system prompt injection

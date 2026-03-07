@@ -14,11 +14,11 @@ import (
 	"github.com/startower-observability/blackcat/internal/hooks"
 	"github.com/startower-observability/blackcat/internal/llm"
 	"github.com/startower-observability/blackcat/internal/memory"
+	"github.com/startower-observability/blackcat/internal/observability"
 	"github.com/startower-observability/blackcat/internal/security"
 	"github.com/startower-observability/blackcat/internal/skills"
 	"github.com/startower-observability/blackcat/internal/tools"
 	"github.com/startower-observability/blackcat/internal/types"
-	"github.com/startower-observability/blackcat/internal/observability"
 	"github.com/startower-observability/blackcat/internal/workspace"
 )
 
@@ -38,6 +38,7 @@ type Loop struct {
 	maxContextTokens   int
 	compactor          *Compactor
 	agentName          string
+	sessionID          string
 	agentLanguage      string
 	agentTone          string
 	modelName          string
@@ -48,11 +49,11 @@ type Loop struct {
 	guardrails         *guardrailsPkg.Pipeline
 	interruptMgr       *InterruptManager
 	eventStream        chan<- AgentEvent
-	traceID        string
-	costTracker    *observability.CostTracker
-	reflector      *Reflector
-	prefMgr        *PreferenceManager
-	planner        *Planner
+	traceID            string
+	costTracker        *observability.CostTracker
+	reflector          *Reflector
+	prefMgr            *PreferenceManager
+	planner            *Planner
 }
 
 type LoopConfig struct {
@@ -69,6 +70,7 @@ type LoopConfig struct {
 	MaxContextTokens   int
 	MemoryFileStore    *memory.FileStore
 	AgentName          string
+	SessionID          string
 	AgentLanguage      string
 	AgentTone          string
 	ModelName          string
@@ -77,11 +79,11 @@ type LoopConfig struct {
 	UserID             string
 	CoreStore          *memory.CoreStore
 	Guardrails         *guardrailsPkg.Pipeline
-	EventStream    chan<- AgentEvent
-	CostTracker    *observability.CostTracker // optional, nil skips recording
-	Reflector      *Reflector      // optional, nil disables self-reflection
-	PrefManager    *PreferenceManager // optional, nil disables adaptive preferences
-	Planner        *Planner           // optional, nil disables plan-and-execute
+	EventStream        chan<- AgentEvent
+	CostTracker        *observability.CostTracker // optional, nil skips recording
+	Reflector          *Reflector                 // optional, nil disables self-reflection
+	PrefManager        *PreferenceManager         // optional, nil disables adaptive preferences
+	Planner            *Planner                   // optional, nil disables plan-and-execute
 }
 
 func NewLoop(cfg LoopConfig) *Loop {
@@ -139,6 +141,7 @@ func NewLoop(cfg LoopConfig) *Loop {
 		maxContextTokens:   cfg.MaxContextTokens,
 		compactor:          compactor,
 		agentName:          cfg.AgentName,
+		sessionID:          cfg.SessionID,
 		agentLanguage:      cfg.AgentLanguage,
 		agentTone:          cfg.AgentTone,
 		modelName:          cfg.ModelName,
@@ -301,7 +304,7 @@ func (l *Loop) processOneTurn(ctx context.Context, execution *Execution, toolDef
 
 	// Record token cost if tracker is available
 	if l.costTracker != nil {
-		_ = l.costTracker.Record(ctx, l.userID, "", l.modelName, l.providerName,
+		_ = l.costTracker.Record(ctx, l.userID, l.sessionID, l.modelName, l.providerName,
 			promptTokens, completionTokens)
 	}
 

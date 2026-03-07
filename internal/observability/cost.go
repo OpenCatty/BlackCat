@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/startower-observability/blackcat/internal/config"
 )
 
 // pricePerMInputTokens maps model names to cost per 1M input tokens (USD).
@@ -18,8 +20,8 @@ var pricePerMInputTokens = map[string]float64{
 	"claude-3-opus":     15.0,
 	"gemini-1.5-pro":    1.25,
 	"gemini-1.5-flash":  0.075,
-	"gpt-5-mini":    0.15,
-	"gpt-4.1-mini":  0.15,
+	"gpt-5-mini":        0.15,
+	"gpt-4.1-mini":      0.15,
 }
 
 // pricePerMOutputTokens maps model names to cost per 1M output tokens (USD).
@@ -32,8 +34,8 @@ var pricePerMOutputTokens = map[string]float64{
 	"claude-3-opus":     75.0,
 	"gemini-1.5-pro":    5.00,
 	"gemini-1.5-flash":  0.30,
-	"gpt-5-mini":    0.60,
-	"gpt-4.1-mini":  0.60,
+	"gpt-5-mini":        0.60,
+	"gpt-4.1-mini":      0.60,
 }
 
 const (
@@ -55,6 +57,25 @@ type ModelUsage struct {
 type UserModelUsage struct {
 	UserID string
 	ModelUsage
+}
+
+// BudgetStatus represents the result of a budget check.
+type BudgetStatus int
+
+const (
+	BudgetOK BudgetStatus = iota
+	BudgetWarning
+	BudgetExceeded
+)
+
+// BudgetCheckResult holds the outcome of a budget check for a user.
+type BudgetCheckResult struct {
+	Status       BudgetStatus
+	DailySpend   float64
+	DailyLimit   float64
+	MonthlySpend float64
+	MonthlyLimit float64
+	Message      string
 }
 
 // CostTracker records per-user token usage and estimated cost in SQLite.
@@ -87,6 +108,18 @@ func createCostSchema(db *sql.DB) error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_usage_user ON token_usage(user_id);
 	CREATE INDEX IF NOT EXISTS idx_usage_model ON token_usage(model);
+
+	CREATE TABLE IF NOT EXISTS budget_alerts (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id     TEXT    NOT NULL,
+		period      TEXT    NOT NULL,
+		status      TEXT    NOT NULL,
+		spend_usd   REAL    NOT NULL,
+		limit_usd   REAL    NOT NULL,
+		alerted_at  DATETIME NOT NULL DEFAULT (datetime('now'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_budget_alerts_user_period ON budget_alerts(user_id, period);
+	CREATE INDEX IF NOT EXISTS idx_token_usage_user_date ON token_usage(user_id, date(recorded_at));
 	`
 	_, err := db.Exec(schema)
 	return err
@@ -237,4 +270,80 @@ func estimateCost(model string, inputTokens, outputTokens int64) float64 {
 		outPrice = defaultOutputPricePerM
 	}
 	return (float64(inputTokens)/1e6)*inPrice + (float64(outputTokens)/1e6)*outPrice
+}
+
+// DailySpendUSD returns the estimated total spend in USD for the given user today (UTC).
+func (ct *CostTracker) DailySpendUSD(ctx context.Context, userID string) (float64, error) {
+	row := ct.db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(input_tokens * ? / 1000000.0 + output_tokens * ? / 1000000.0), 0)
+		FROM token_usage
+		WHERE user_id = ? AND date(recorded_at) = date('now', 'utc')
+	`, defaultInputPricePerM, defaultOutputPricePerM, userID)
+	var total float64
+	if err := row.Scan(&total); err != nil {
+		return 0, fmt.Errorf("daily spend query: %w", err)
+	}
+	return total, nil
+}
+
+// MonthlySpendUSD returns the estimated total spend in USD for the given user this month (UTC).
+func (ct *CostTracker) MonthlySpendUSD(ctx context.Context, userID string) (float64, error) {
+	row := ct.db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(input_tokens * ? / 1000000.0 + output_tokens * ? / 1000000.0), 0)
+		FROM token_usage
+		WHERE user_id = ? AND strftime('%Y-%m', recorded_at) = strftime('%Y-%m', 'now', 'utc')
+	`, defaultInputPricePerM, defaultOutputPricePerM, userID)
+	var total float64
+	if err := row.Scan(&total); err != nil {
+		return 0, fmt.Errorf("monthly spend query: %w", err)
+	}
+	return total, nil
+}
+
+// CheckBudget evaluates the user's current spend against the configured budget limits.
+// It is a read-only operation (no DB inserts).
+func (ct *CostTracker) CheckBudget(ctx context.Context, userID string, cfg config.BudgetConfig) (BudgetCheckResult, error) {
+	if !cfg.Enabled {
+		return BudgetCheckResult{Status: BudgetOK}, nil
+	}
+
+	daily, err := ct.DailySpendUSD(ctx, userID)
+	if err != nil {
+		return BudgetCheckResult{}, fmt.Errorf("check budget: %w", err)
+	}
+	monthly, err := ct.MonthlySpendUSD(ctx, userID)
+	if err != nil {
+		return BudgetCheckResult{}, fmt.Errorf("check budget: %w", err)
+	}
+
+	result := BudgetCheckResult{
+		Status:       BudgetOK,
+		DailySpend:   daily,
+		DailyLimit:   cfg.DailyLimitUSD,
+		MonthlySpend: monthly,
+		MonthlyLimit: cfg.MonthlyLimitUSD,
+	}
+
+	// Check Exceeded first (higher priority), then Warning
+	if cfg.DailyLimitUSD > 0 && daily >= cfg.DailyLimitUSD {
+		result.Status = BudgetExceeded
+		result.Message = fmt.Sprintf("daily spend $%.4f exceeds limit $%.2f", daily, cfg.DailyLimitUSD)
+		return result, nil
+	}
+	if cfg.MonthlyLimitUSD > 0 && monthly >= cfg.MonthlyLimitUSD {
+		result.Status = BudgetExceeded
+		result.Message = fmt.Sprintf("monthly spend $%.4f exceeds limit $%.2f", monthly, cfg.MonthlyLimitUSD)
+		return result, nil
+	}
+	if cfg.DailyLimitUSD > 0 && daily >= cfg.DailyLimitUSD*cfg.WarnThreshold {
+		result.Status = BudgetWarning
+		result.Message = fmt.Sprintf("daily spend $%.4f approaching limit $%.2f", daily, cfg.DailyLimitUSD)
+		return result, nil
+	}
+	if cfg.MonthlyLimitUSD > 0 && monthly >= cfg.MonthlyLimitUSD*cfg.WarnThreshold {
+		result.Status = BudgetWarning
+		result.Message = fmt.Sprintf("monthly spend $%.4f approaching limit $%.2f", monthly, cfg.MonthlyLimitUSD)
+		return result, nil
+	}
+	return result, nil
 }

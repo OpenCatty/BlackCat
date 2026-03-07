@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -171,5 +172,134 @@ name: Empty Body Skill
 
 	if body != "" {
 		t.Errorf("Expected empty body, got %q", body)
+	}
+}
+
+func TestParseFrontmatterPhase3Fields(t *testing.T) {
+	cases := []struct {
+		name          string
+		content       string
+		wantVersion   string
+		wantInstall   string
+		wantDependsOn []string
+		wantAnyBins   [][]string
+		checkDepsNil  bool // true = assert DependsOn is nil
+	}{
+		{
+			name: "all Phase 3 fields present",
+			content: `---
+name: test-skill
+version: v1.2.3
+install: brew install jq
+depends_on:
+  - base-skill
+  - utils-skill
+requires:
+  any_bins:
+    - [jq, jq-osx-amd64]
+    - [curl]
+---
+body content`,
+			wantVersion:   "v1.2.3",
+			wantInstall:   "brew install jq",
+			wantDependsOn: []string{"base-skill", "utils-skill"},
+			wantAnyBins:   [][]string{{"jq", "jq-osx-amd64"}, {"curl"}},
+		},
+		{
+			name: "version only no install depends_on any_bins",
+			content: `---
+name: minimal
+version: v0.1.0
+---
+body`,
+			wantVersion:   "v0.1.0",
+			wantInstall:   "",
+			wantDependsOn: nil,
+			wantAnyBins:   nil,
+			checkDepsNil:  true,
+		},
+		{
+			name: "any_bins single group",
+			content: `---
+name: bins-only
+requires:
+  any_bins:
+    - [python3, python]
+---`,
+			wantVersion:   "",
+			wantInstall:   "",
+			wantDependsOn: nil,
+			wantAnyBins:   [][]string{{"python3", "python"}},
+			checkDepsNil:  true,
+		},
+		{
+			name: "empty new fields legacy skill",
+			content: `---
+name: legacy
+description: old skill
+---
+body`,
+			wantVersion:   "",
+			wantInstall:   "",
+			wantDependsOn: nil,
+			wantAnyBins:   nil,
+			checkDepsNil:  true,
+		},
+		{
+			name: "depends_on empty explicit list",
+			content: `---
+name: no-deps
+depends_on: []
+---`,
+			wantVersion:   "",
+			wantInstall:   "",
+			wantDependsOn: []string{},
+			wantAnyBins:   nil,
+		},
+		{
+			name: "install with special characters",
+			content: `---
+name: complex-install
+install: 'pip install "my-package[extra]" --user'
+---`,
+			wantVersion:   "",
+			wantInstall:   `pip install "my-package[extra]" --user`,
+			wantDependsOn: nil,
+			wantAnyBins:   nil,
+			checkDepsNil:  true,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			data, _, has := ParseFrontmatter(tc.content)
+
+			if !has {
+				t.Fatal("Expected hasFrontmatter to be true")
+			}
+
+			if data.Version != tc.wantVersion {
+				t.Errorf("Version: want %q, got %q", tc.wantVersion, data.Version)
+			}
+
+			if data.Install != tc.wantInstall {
+				t.Errorf("Install: want %q, got %q", tc.wantInstall, data.Install)
+			}
+
+			if tc.checkDepsNil {
+				if data.DependsOn != nil {
+					t.Errorf("DependsOn: want nil, got %v", data.DependsOn)
+				}
+			} else {
+				if !reflect.DeepEqual(data.DependsOn, tc.wantDependsOn) {
+					t.Errorf("DependsOn: want %v, got %v", tc.wantDependsOn, data.DependsOn)
+				}
+			}
+
+			if !reflect.DeepEqual(data.Requires.AnyBins, tc.wantAnyBins) {
+				t.Errorf("AnyBins: want %v, got %v", tc.wantAnyBins, data.Requires.AnyBins)
+			}
+		})
 	}
 }

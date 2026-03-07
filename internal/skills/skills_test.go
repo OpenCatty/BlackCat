@@ -505,3 +505,116 @@ func TestLimitSkillCount(t *testing.T) {
 		}
 	})
 }
+
+// TestValidateVersion_Valid valid semver "v1.2.3" returns canonical form
+func TestValidateVersion_Valid(t *testing.T) {
+	canonical, err := ValidateVersion("v1.2.3")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if canonical != "v1.2.3" {
+		t.Fatalf("expected \"v1.2.3\", got %q", canonical)
+	}
+}
+
+// TestValidateVersion_Invalid missing "v" prefix returns error
+func TestValidateVersion_Invalid(t *testing.T) {
+	_, err := ValidateVersion("1.2.3")
+	if err == nil {
+		t.Fatal("expected error for missing 'v' prefix, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid semver") {
+		t.Fatalf("expected error to contain 'invalid semver', got: %v", err)
+	}
+}
+
+// TestValidateVersion_Empty empty string returns ("", nil)
+func TestValidateVersion_Empty(t *testing.T) {
+	canonical, err := ValidateVersion("")
+	if err != nil {
+		t.Fatalf("expected no error for empty string, got: %v", err)
+	}
+	if canonical != "" {
+		t.Fatalf("expected empty string, got %q", canonical)
+	}
+}
+
+// TestCheckAnyBins table-driven tests for checkAnyBins
+func TestCheckAnyBins(t *testing.T) {
+	tests := []struct {
+		name    string
+		anyBins [][]string
+		want    bool
+	}{
+		{
+			name:    "empty anyBins nil",
+			anyBins: nil,
+			want:    true,
+		},
+		{
+			name:    "empty anyBins slice",
+			anyBins: [][]string{},
+			want:    true,
+		},
+		{
+			name:    "single group found",
+			anyBins: [][]string{{"go"}},
+			want:    true,
+		},
+		{
+			name:    "single group not found",
+			anyBins: [][]string{{"__nonexistent_binary__"}},
+			want:    false,
+		},
+		{
+			name:    "OR first matches",
+			anyBins: [][]string{{"go", "__nonexistent__"}},
+			want:    true,
+		},
+		{
+			name:    "OR second matches",
+			anyBins: [][]string{{"__nonexistent__", "go"}},
+			want:    true,
+		},
+		{
+			name:    "OR none match",
+			anyBins: [][]string{{"__nonexistent__", "__also_nonexistent__"}},
+			want:    false,
+		},
+		{
+			name:    "multi group all satisfied",
+			anyBins: [][]string{{"go"}, {"go"}},
+			want:    true,
+		},
+		{
+			name:    "multi group one fails",
+			anyBins: [][]string{{"go"}, {"__nonexistent__"}},
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := checkAnyBins(tt.anyBins)
+			if got != tt.want {
+				t.Errorf("checkAnyBins(%v) = %v, want %v", tt.anyBins, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetBinaryVersion_ExistingBinary "go" should return a non-empty version string
+func TestGetBinaryVersion_ExistingBinary(t *testing.T) {
+	v := getBinaryVersion("go")
+	if v == "" {
+		t.Error("expected non-empty version for 'go' binary")
+	}
+}
+
+// TestGetBinaryVersion_NonexistentBinary nonexistent binary returns empty string
+func TestGetBinaryVersion_NonexistentBinary(t *testing.T) {
+	v := getBinaryVersion("__nonexistent_binary_xyz__")
+	if v != "" {
+		t.Errorf("expected empty version for nonexistent binary, got %q", v)
+	}
+}
