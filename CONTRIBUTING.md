@@ -1,162 +1,107 @@
-# Contributing to OpenClaw
+# Contributing to BlackCat
 
-Welcome to the lobster tank! 🦞
+We welcome contributions, even from dogs. (Just kidding. No dogs.)
 
-## Quick Links
+---
 
-- **GitHub:** https://github.com/openclaw/openclaw
-- **Vision:** [`VISION.md`](VISION.md)
-- **Discord:** https://discord.gg/qkhbAGHRBT
-- **X/Twitter:** [@steipete](https://x.com/steipete) / [@openclaw](https://x.com/openclaw)
+## Getting Started
 
-## Maintainers
+Fork the repo, clone it, and install dependencies:
 
-- **Peter Steinberger** - Benevolent Dictator
-  - GitHub: [@steipete](https://github.com/steipete) · X: [@steipete](https://x.com/steipete)
-
-- **Shadow** - Discord subsystem, Discord admin, Clawhub, all community moderation
-  - GitHub: [@thewilloftheshadow](https://github.com/thewilloftheshadow) · X: [@4shad0wed](https://x.com/4shad0wed)
-
-- **Vignesh** - Memory (QMD), formal modeling, TUI, IRC, and Lobster
-  - GitHub: [@vignesh07](https://github.com/vignesh07) · X: [@\_vgnsh](https://x.com/_vgnsh)
-
-- **Jos** - Telegram, API, Nix mode
-  - GitHub: [@joshp123](https://github.com/joshp123) · X: [@jjpcodes](https://x.com/jjpcodes)
-
-- **Ayaan Zaidi** - Telegram subsystem, iOS app
-  - GitHub: [@obviyus](https://github.com/obviyus) · X: [@0bviyus](https://x.com/0bviyus)
-
-- **Tyler Yust** - Agents/subagents, cron, BlueBubbles, macOS app
-  - GitHub: [@tyler6204](https://github.com/tyler6204) · X: [@tyleryust](https://x.com/tyleryust)
-
-- **Mariano Belinky** - iOS app, Security
-  - GitHub: [@mbelinky](https://github.com/mbelinky) · X: [@belimad](https://x.com/belimad)
-
-- **Nimrod Gutman** - iOS app, macOS app and crustacean features
-  - GitHub: [@ngutman](https://github.com/ngutman) · X: [@theguti](https://x.com/theguti)
-
-- **Vincent Koc** - Agents, Telemetry, Hooks, Security
-  - GitHub: [@vincentkoc](https://github.com/vincentkoc) · X: [@vincent_koc](https://x.com/vincent_koc)
-
-- **Val Alexander** - UI/UX, Docs, and Agent DevX
-  - GitHub: [@BunsDev](https://github.com/BunsDev) · X: [@BunsDev](https://x.com/BunsDev)
-
-- **Seb Slight** - Docs, Agent Reliability, Runtime Hardening
-  - GitHub: [@sebslight](https://github.com/sebslight) · X: [@sebslig](https://x.com/sebslig)
-
-- **Christoph Nakazawa** - JS Infra
-  - GitHub: [@cpojer](https://github.com/cpojer) · X: [@cnakazawa](https://x.com/cnakazawa)
-
-- **Gustavo Madeira Santana** - Multi-agents, CLI, web UI
-  - GitHub: [@gumadeiras](https://github.com/gumadeiras) · X: [@gumadeiras](https://x.com/gumadeiras)
-
-- **Onur Solmaz** - Agents, dev workflows, ACP integrations, MS Teams
-  - GitHub: [@onutc](https://github.com/onutc), [@osolmaz](https://github.com/osolmaz) · X: [@onusoz](https://x.com/onusoz)
-
-- **Josh Avant** - Core, CLI, Gateway, Security, Agents
-  - GitHub: [@joshavant](https://github.com/joshavant) · X: [@joshavant](https://x.com/joshavant)
-
-- **Jonathan Taylor** - ACP subsystem, Gateway features/bugs, Gog/Mog/Sog CLI's, SEDMAT
-  - Github [@visionik](https://github.com/visionik) · X: [@visionik](https://x.com/visionik)
-- **Josh Lehman** - Compaction, Tlon/Urbit subsystem
-  - Github [@jalehman](https://github.com/jalehman) · X: [@jlehman\_](https://x.com/jlehman_)
-
-## How to Contribute
-
-1. **Bugs & small fixes** → Open a PR!
-2. **New features / architecture** → Start a [GitHub Discussion](https://github.com/openclaw/openclaw/discussions) or ask in Discord first
-3. **Questions** → Discord [#help](https://discord.com/channels/1456350064065904867/1459642797895319552) / [#users-helping-users](https://discord.com/channels/1456350064065904867/1459007081603403828)
-
-## Before You PR
-
-- Test locally with your OpenClaw instance
-- Run tests: `pnpm build && pnpm check && pnpm test`
-- Ensure CI checks pass
-- Keep PRs focused (one thing per PR; do not mix unrelated concerns)
-- Describe what & why
-- **Include screenshots** — one showing the problem/before, one showing the fix/after (for UI or visual changes)
-
-## Control UI Decorators
-
-The Control UI uses Lit with **legacy** decorators (current Rollup parsing does not support
-`accessor` fields required for standard decorators). When adding reactive fields, keep the
-legacy style:
-
-```ts
-@state() foo = "bar";
-@property({ type: Number }) count = 0;
+```bash
+git clone https://github.com/OpenCatty/BlackCat.git
+cd BlackCat
+node install
 ```
 
-The root `tsconfig.json` is configured for legacy decorators (`experimentalDecorators: true`)
-with `useDefineForClassFields: false`. Avoid flipping these unless you are also updating the UI
-build tooling to support standard decorators.
+**Note:** `pnpm` is NOT available in the shell. Use `node` directly.
 
-## AI/Vibe-Coded PRs Welcome! 🤖
+---
 
-Built with Codex, Claude, or other AI tools? **Awesome - just mark it!**
+## Development Setup
 
-Please include in your PR:
+Key things to know about the codebase:
 
-- [ ] Mark as AI-assisted in the PR title or description
-- [ ] Note the degree of testing (untested / lightly tested / fully tested)
-- [ ] Include prompts or session logs if possible (super helpful!)
-- [ ] Confirm you understand what the code does
+- **Language:** TypeScript (ESM, strict mode)
+- **Test runner:** Vitest
+- **Config format:** JSON5 (not YAML)
+- **Module:** `github.com/OpenCatty/BlackCat`
 
-AI PRs are first-class citizens here. We just want transparency so reviewers know what to look for.
+---
 
-## Current Focus & Roadmap 🗺
+## Testing
 
-We are currently prioritizing:
+Before submitting PRs, run the test suite:
 
-- **Stability**: Fixing edge cases in channel connections (WhatsApp/Telegram).
-- **UX**: Improving the onboarding wizard and error messages.
-- **Skills**: For skill contributions, head to [ClawHub](https://clawhub.ai/) — the community hub for OpenClaw skills.
-- **Performance**: Optimizing token usage and compaction logic.
+```bash
+# Run BlackCat router tests (17/17 must pass)
+node node_modules/vitest/vitest.mjs run src/blackcat/
 
-Check the [GitHub Issues](https://github.com/openclaw/openclaw/issues) for "good first issue" labels!
+# Run all tests
+node node_modules/vitest/vitest.mjs run
+```
 
-## Maintainers
+All 17 router tests must pass. These validate the 7-role keyword classification system.
 
-We're selectively expanding the maintainer team.
-If you're an experienced contributor who wants to help shape OpenClaw's direction — whether through code, docs, or community — we'd like to hear from you.
+---
 
-Being a maintainer is a responsibility, not an honorary title. We expect active, consistent involvement — triaging issues, reviewing PRs, and helping move the project forward.
+## Adding a Role
 
-Still interested? Email contributing@openclaw.ai with:
+To add a new agent role:
 
-- Links to your PRs on OpenClaw (if you don't have any, start there first)
-- Links to open source projects you maintain or actively contribute to
-- Your GitHub, Discord, and X/Twitter handles
-- A brief intro: background, experience, and areas of interest
-- Languages you speak and where you're based
-- How much time you can realistically commit
+1. **Config**: Add entry to `blackcat.example.json5` in `agents.list`
+2. **Workspace**: Create `workspaces/<role>/` with `AGENTS.md` + `SOUL.md`
+3. **Router**: Add role to `src/blackcat/router.ts` `DEFAULT_ROLES`
+4. **Test**: Run router tests, verify 17/17 pass
 
-We welcome people across all skill sets — engineering, documentation, community management, and more.
-We review every human-only-written application carefully and add maintainers slowly and deliberately.
-Please allow a few weeks for a response.
+See `AGENTS.md` for full details.
 
-## Report a Vulnerability
+---
 
-We take security reports seriously. Report vulnerabilities directly to the repository where the issue lives:
+## Adding a Skill
 
-- **Core CLI and gateway** — [openclaw/openclaw](https://github.com/openclaw/openclaw)
-- **macOS desktop app** — [openclaw/openclaw](https://github.com/openclaw/openclaw) (apps/macos)
-- **iOS app** — [openclaw/openclaw](https://github.com/openclaw/openclaw) (apps/ios)
-- **Android app** — [openclaw/openclaw](https://github.com/openclaw/openclaw) (apps/android)
-- **ClawHub** — [openclaw/clawhub](https://github.com/openclaw/clawhub)
-- **Trust and threat model** — [openclaw/trust](https://github.com/openclaw/trust)
+To add a reusable skill:
 
-For issues that don't fit a specific repo, or if you're unsure, email **security@openclaw.ai** and we'll route it.
+1. Create `workspaces/shared-skills/<skill-name>/SKILL.md`
+2. Add frontmatter with `name`, `version`, `tags`, optional `requires`
+3. Skills auto-load via config
 
-### Required in Reports
+Skills MUST be in subdirectories. Flat `.md` files are ignored.
 
-1. **Title**
-2. **Severity Assessment**
-3. **Impact**
-4. **Affected Component**
-5. **Technical Reproduction**
-6. **Demonstrated Impact**
-7. **Environment**
-8. **Remediation Advice**
+---
 
-Reports without reproduction steps, demonstrated impact, and remediation advice will be deprioritized. Given the volume of AI-generated scanner findings, we must ensure we're receiving vetted reports from researchers who understand the issues.
+## Pull Request Process
+
+- Keep PRs small and focused (one feature per PR)
+- Include tests for new functionality
+- Follow existing code patterns
+- Use Conventional Commit format: `type(scope): description`
+- No `openclaw` references in new code
+
+Commit types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`
+
+---
+
+## Code Style
+
+- TypeScript strict mode, no `any`, no `@ts-ignore`
+- Explicit error handling
+- Colocated tests: `*.test.ts` next to source
+- Follow existing patterns in `src/blackcat/`
+- Keep files under 500 lines when possible
+
+---
+
+## Issues
+
+Found a bug? Have an idea? Open an issue:
+
+https://github.com/OpenCatty/BlackCat/issues
+
+---
+
+## Cat Tax
+
+BlackCat has personality. If you're adding user-facing strings, read `SOUL.md` to understand the tone. Direct, decisive, occasionally sassy. No corporate speak.
+
+Nyaa~ 🐱
