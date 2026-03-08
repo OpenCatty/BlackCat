@@ -38,8 +38,8 @@ jobs:
 
       - name: Run root Dockerfile CLI smoke
         run: |
-          docker build -t openclaw-dockerfile-smoke:local -f Dockerfile .
-          docker run --rm --entrypoint sh openclaw-dockerfile-smoke:local -lc 'which openclaw && openclaw --version'
+          docker build -t blackcat-dockerfile-smoke:local -f Dockerfile .
+          docker run --rm --entrypoint sh blackcat-dockerfile-smoke:local -lc 'which blackcat && blackcat --version'
 
       # This smoke only validates that the build-arg path preinstalls selected
       # extension deps without breaking image build or basic CLI startup. It
@@ -47,14 +47,14 @@ jobs:
       - name: Smoke test Dockerfile with extension build arg
         run: |
           docker build \
-            --build-arg OPENCLAW_EXTENSIONS="diagnostics-otel" \
-            -t openclaw-ext-smoke:local -f Dockerfile .
-          docker run --rm --entrypoint sh openclaw-ext-smoke:local -lc 'which openclaw && openclaw --version'
+            --build-arg BLACKCAT_EXTENSIONS="diagnostics-otel" \
+            -t blackcat-ext-smoke:local -f Dockerfile .
+          docker run --rm --entrypoint sh blackcat-ext-smoke:local -lc 'which blackcat && blackcat --version'
 
       - name: Run installer docker tests
         env:
-          CLAWDBOT_INSTALL_URL: https://openclaw.ai/install.sh
-          CLAWDBOT_INSTALL_CLI_URL: https://openclaw.ai/install-cli.sh
+          CLAWDBOT_INSTALL_URL: https://blackcat.ai/install.sh
+          CLAWDBOT_INSTALL_CLI_URL: https://blackcat.ai/install-cli.sh
           CLAWDBOT_NO_ONBOARD: "1"
           CLAWDBOT_INSTALL_SMOKE_SKIP_CLI: "1"
           CLAWDBOT_INSTALL_SMOKE_SKIP_NONROOT: ${{ github.event_name == 'pull_request' && '1' || '0' }}
