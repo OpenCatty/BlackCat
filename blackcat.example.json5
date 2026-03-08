@@ -1,0 +1,62 @@
+// BlackCat Example Configuration
+// 7-role agent setup for the BlackCat AI daemon
+// Copy this file to your config location and customize as needed.
+{
+  agents: {
+    defaults: {
+      model: { primary: "gpt-4o" },
+    },
+    list: [
+      {
+        id: "blackcat-phantom",
+        name: "BlackCat Phantom",
+        workspace: "./workspaces/phantom",
+        model: { primary: "gpt-4o" },
+        params: { temperature: 0.2 },
+      },
+      {
+        id: "blackcat-astrology",
+        name: "BlackCat Astrology",
+        workspace: "./workspaces/astrology",
+        model: { primary: "gpt-4o" },
+        params: { temperature: 0.4 },
+      },
+      {
+        id: "blackcat-wizard",
+        name: "BlackCat Wizard",
+        workspace: "./workspaces/wizard",
+        model: { primary: "gpt-4o" },
+        params: { temperature: 0.2 },
+      },
+      {
+        id: "blackcat-artist",
+        name: "BlackCat Artist",
+        workspace: "./workspaces/artist",
+        model: { primary: "gpt-4o" },
+        params: { temperature: 0.7 },
+      },
+      {
+        id: "blackcat-scribe",
+        name: "BlackCat Scribe",
+        workspace: "./workspaces/scribe",
+        model: { primary: "gpt-4o" },
+        params: { temperature: 0.5 },
+      },
+      {
+        id: "blackcat-explorer",
+        name: "BlackCat Explorer",
+        workspace: "./workspaces/explorer",
+        model: { primary: "gpt-4o" },
+        params: { temperature: 0.3 },
+      },
+      {
+        id: "blackcat-oracle",
+        name: "BlackCat Oracle",
+        default: true,
+        workspace: "./workspaces/oracle",
+        model: { primary: "gpt-4o" },
+        params: { temperature: 0.5 },
+      },
+    ],
+  },
+}
