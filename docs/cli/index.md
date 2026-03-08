@@ -1,5 +1,5 @@
 ---
-summary: "OpenClaw CLI reference for `openclaw` commands, subcommands, and options"
+summary: "BlackCat CLI reference for `blackcat` commands, subcommands, and options"
 read_when:
   - Adding or modifying CLI commands or options
   - Documenting new command surfaces
@@ -55,15 +55,14 @@ This page describes the current CLI behavior. If commands change, update this do
 - [`secrets`](/cli/secrets)
 - [`skills`](/cli/skills)
 - [`daemon`](/cli/daemon) (legacy alias for gateway service commands)
-- [`clawbot`](/cli/clawbot) (legacy alias namespace)
 - [`voicecall`](/cli/voicecall) (plugin; if installed)
 
 ## Global flags
 
-- `--dev`: isolate state under `~/.openclaw-dev` and shift default ports.
-- `--profile <name>`: isolate state under `~/.openclaw-<name>`.
+- `--dev`: isolate state under `~/.blackcat-dev` and shift default ports.
+- `--profile <name>`: isolate state under `~/.blackcat-<name>`.
 - `--no-color`: disable ANSI colors.
-- `--update`: shorthand for `openclaw update` (source installs only).
+- `--update`: shorthand for `blackcat update` (source installs only).
 - `-V`, `--version`, `-v`: print version and exit.
 
 ## Output styling
@@ -76,7 +75,7 @@ This page describes the current CLI behavior. If commands change, update this do
 
 ## Color palette
 
-OpenClaw uses a lobster palette for CLI output.
+BlackCat uses a lobster palette for CLI output.
 
 - `accent` (#FF5A2D): headings, labels, primary highlights.
 - `accentBright` (#FF7A3D): command names, emphasis.
@@ -92,7 +91,7 @@ Palette source of truth: `src/terminal/palette.ts` (aka “lobster seam”).
 ## Command tree
 
 ```
-openclaw [--dev] [--profile <name>] <command>
+blackcat [--dev] [--profile <name>] <command>
   setup
   onboard
   configure
@@ -251,38 +250,36 @@ openclaw [--dev] [--profile <name>] <command>
     list
     approve
   qr
-  clawbot
-    qr
   docs
   dns
     setup
   tui
 ```
 
-Note: plugins can add additional top-level commands (for example `openclaw voicecall`).
+Note: plugins can add additional top-level commands (for example `blackcat voicecall`).
 
 ## Security
 
-- `openclaw security audit` — audit config + local state for common security foot-guns.
-- `openclaw security audit --deep` — best-effort live Gateway probe.
-- `openclaw security audit --fix` — tighten safe defaults and chmod state/config.
+- `blackcat security audit` — audit config + local state for common security foot-guns.
+- `blackcat security audit --deep` — best-effort live Gateway probe.
+- `blackcat security audit --fix` — tighten safe defaults and chmod state/config.
 
 ## Secrets
 
-- `openclaw secrets reload` — re-resolve refs and atomically swap the runtime snapshot.
-- `openclaw secrets audit` — scan for plaintext residues, unresolved refs, and precedence drift.
-- `openclaw secrets configure` — interactive helper for provider setup + SecretRef mapping + preflight/apply.
-- `openclaw secrets apply --from <plan.json>` — apply a previously generated plan (`--dry-run` supported).
+- `blackcat secrets reload` — re-resolve refs and atomically swap the runtime snapshot.
+- `blackcat secrets audit` — scan for plaintext residues, unresolved refs, and precedence drift.
+- `blackcat secrets configure` — interactive helper for provider setup + SecretRef mapping + preflight/apply.
+- `blackcat secrets apply --from <plan.json>` — apply a previously generated plan (`--dry-run` supported).
 
 ## Plugins
 
 Manage extensions and their config:
 
-- `openclaw plugins list` — discover plugins (use `--json` for machine output).
-- `openclaw plugins info <id>` — show details for a plugin.
-- `openclaw plugins install <path|.tgz|npm-spec>` — install a plugin (or add a plugin path to `plugins.load.paths`).
-- `openclaw plugins enable <id>` / `disable <id>` — toggle `plugins.entries.<id>.enabled`.
-- `openclaw plugins doctor` — report plugin load errors.
+- `blackcat plugins list` — discover plugins (use `--json` for machine output).
+- `blackcat plugins info <id>` — show details for a plugin.
+- `blackcat plugins install <path|.tgz|npm-spec>` — install a plugin (or add a plugin path to `plugins.load.paths`).
+- `blackcat plugins enable <id>` / `disable <id>` — toggle `plugins.entries.<id>.enabled`.
+- `blackcat plugins doctor` — report plugin load errors.
 
 Most plugin changes require a gateway restart. See [/plugin](/tools/plugin).
 
@@ -290,9 +287,9 @@ Most plugin changes require a gateway restart. See [/plugin](/tools/plugin).
 
 Vector search over `MEMORY.md` + `memory/*.md`:
 
-- `openclaw memory status` — show index stats.
-- `openclaw memory index` — reindex memory files.
-- `openclaw memory search "<query>"` (or `--query "<query>"`) — semantic search over memory.
+- `blackcat memory status` — show index stats.
+- `blackcat memory index` — reindex memory files.
+- `blackcat memory search "<query>"` (or `--query "<query>"`) — semantic search over memory.
 
 ## Chat slash commands
 
@@ -312,7 +309,7 @@ Initialize config + workspace.
 
 Options:
 
-- `--workspace <dir>`: agent workspace path (default `~/.openclaw/workspace`).
+- `--workspace <dir>`: agent workspace path (default `~/.blackcat/workspace`).
 - `--wizard`: run the onboarding wizard.
 - `--non-interactive`: run wizard without prompts.
 - `--mode <local|remote>`: wizard mode.
@@ -381,7 +378,7 @@ Interactive configuration wizard (models, channels, skills, gateway).
 
 ### `config`
 
-Non-interactive config helpers (get/set/unset/file/validate). Running `openclaw config` with no
+Non-interactive config helpers (get/set/unset/file/validate). Running `blackcat config` with no
 subcommand launches the wizard.
 
 Subcommands:
@@ -413,11 +410,11 @@ Manage chat channel accounts (WhatsApp/Telegram/Discord/Google Chat/Slack/Matter
 Subcommands:
 
 - `channels list`: show configured channels and auth profiles.
-- `channels status`: check gateway reachability and channel health (`--probe` runs extra checks; use `openclaw health` or `openclaw status --deep` for gateway health probes).
-- Tip: `channels status` prints warnings with suggested fixes when it can detect common misconfigurations (then points you to `openclaw doctor`).
+- `channels status`: check gateway reachability and channel health (`--probe` runs extra checks; use `blackcat health` or `blackcat status --deep` for gateway health probes).
+- Tip: `channels status` prints warnings with suggested fixes when it can detect common misconfigurations (then points you to `blackcat doctor`).
 - `channels logs`: show recent channel logs from the gateway log file.
 - `channels add`: wizard-style setup when no flags are passed; flags switch to non-interactive mode.
-  - When adding a non-default account to a channel still using single-account top-level config, OpenClaw moves account-scoped values into `channels.<channel>.accounts.default` before writing the new account.
+  - When adding a non-default account to a channel still using single-account top-level config, BlackCat moves account-scoped values into `channels.<channel>.accounts.default` before writing the new account.
   - Non-interactive `channels add` does not auto-create/upgrade bindings; channel-only bindings continue to match the default account.
 - `channels remove`: disable by default; pass `--delete` to remove config entries without prompts.
 - `channels login`: interactive channel login (WhatsApp Web only).
@@ -456,11 +453,11 @@ More detail: [/concepts/oauth](/concepts/oauth)
 Examples:
 
 ```bash
-openclaw channels add --channel telegram --account alerts --name "Alerts Bot" --token $TELEGRAM_BOT_TOKEN
-openclaw channels add --channel discord --account work --name "Work Bot" --token $DISCORD_BOT_TOKEN
-openclaw channels remove --channel discord --account work --delete
-openclaw channels status --probe
-openclaw status --deep
+blackcat channels add --channel telegram --account alerts --name "Alerts Bot" --token $TELEGRAM_BOT_TOKEN
+blackcat channels add --channel discord --account work --name "Work Bot" --token $DISCORD_BOT_TOKEN
+blackcat channels remove --channel discord --account work --delete
+blackcat channels status --probe
+blackcat status --deep
 ```
 
 ### `skills`
@@ -479,7 +476,7 @@ Options:
 - `--json`: output JSON (no styling).
 - `-v`, `--verbose`: include missing requirements detail.
 
-Tip: use `npx clawhub` to search, install, and sync skills.
+Tip: use the skills system to search, install, and sync skills.
 
 ### `pairing`
 
@@ -544,8 +541,8 @@ Subcommands:
 
 Examples:
 
-- `openclaw message send --target +15555550123 --message "Hi"`
-- `openclaw message poll --channel discord --target channel:123 --poll-question "Snack?" --poll-option Pizza --poll-option Sushi`
+- `blackcat message send --target +15555550123 --message "Hi"`
+- `blackcat message poll --channel discord --target channel:123 --poll-question "Snack?" --poll-option Pizza --poll-option Sushi`
 
 ### `agent`
 
@@ -593,7 +590,7 @@ Options:
 - `--non-interactive`
 - `--json`
 
-Binding specs use `channel[:accountId]`. When `accountId` is omitted, OpenClaw may resolve account scope via channel defaults/plugin hooks; otherwise it is a channel binding without explicit account scope.
+Binding specs use `channel[:accountId]`. When `accountId` is omitted, BlackCat may resolve account scope via channel defaults/plugin hooks; otherwise it is a channel binding without explicit account scope.
 
 #### `agents bindings`
 
@@ -660,12 +657,12 @@ Notes:
 
 ### Usage tracking
 
-OpenClaw can surface provider usage/quota when OAuth/API creds are available.
+BlackCat can surface provider usage/quota when OAuth/API creds are available.
 
 Surfaces:
 
 - `/status` (adds a short provider usage line when available)
-- `openclaw status --usage` (prints full provider breakdown)
+- `blackcat status --usage` (prints full provider breakdown)
 - macOS menu bar (Usage section under Context)
 
 Notes:
@@ -775,7 +772,7 @@ Notes:
 
 - `gateway status` probes the Gateway RPC by default using the service’s resolved port/config (override with `--url/--token/--password`).
 - `gateway status` supports `--no-probe`, `--deep`, and `--json` for scripting.
-- `gateway status` also surfaces legacy or extra gateway services when it can detect them (`--deep` adds system-level scans). Profile-named OpenClaw services are treated as first-class and aren't flagged as "extra".
+- `gateway status` also surfaces legacy or extra gateway services when it can detect them (`--deep` adds system-level scans). Profile-named BlackCat services are treated as first-class and aren't flagged as "extra".
 - `gateway status` prints which config path the CLI uses vs which config the service likely uses (service env), plus the resolved probe target URL.
 - `gateway install|uninstall|start|stop|restart` support `--json` for scripting (default output stays human-friendly).
 - `gateway install` defaults to Node runtime; bun is **not recommended** (WhatsApp/Telegram bugs).
@@ -793,11 +790,11 @@ Notes:
 Examples:
 
 ```bash
-openclaw logs --follow
-openclaw logs --limit 200
-openclaw logs --plain
-openclaw logs --json
-openclaw logs --no-color
+blackcat logs --follow
+blackcat logs --limit 200
+blackcat logs --plain
+blackcat logs --json
+blackcat logs --no-color
 ```
 
 ### `gateway <subcommand>`
@@ -833,8 +830,8 @@ Anthropic setup-token (supported):
 
 ```bash
 claude setup-token
-openclaw models auth setup-token --provider anthropic
-openclaw models status
+blackcat models auth setup-token --provider anthropic
+blackcat models status
 ```
 
 Policy note: this is technical compatibility. Anthropic has blocked some
@@ -843,7 +840,7 @@ terms before relying on setup-token in production.
 
 ### `models` (root)
 
-`openclaw models` is an alias for `models status`.
+`blackcat models` is an alias for `models status`.
 
 Root options:
 
@@ -999,7 +996,7 @@ All `cron` commands accept `--url`, `--token`, `--timeout`, `--expect-final`.
 ## Node host
 
 `node` runs a **headless node host** or manages it as a background service. See
-[`openclaw node`](/cli/node).
+[`blackcat node`](/cli/node).
 
 Subcommands:
 
@@ -1054,7 +1051,7 @@ Location:
 
 ## Browser
 
-Browser control CLI (dedicated Chrome/Brave/Edge/Chromium). See [`openclaw browser`](/cli/browser) and the [Browser tool](/tools/browser).
+Browser control CLI (dedicated Chrome/Brave/Edge/Chromium). See [`blackcat browser`](/cli/browser) and the [Browser tool](/tools/browser).
 
 Common options:
 

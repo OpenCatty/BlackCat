@@ -1,12 +1,12 @@
 ---
-summary: "CLI reference for `openclaw node` (headless node host)"
+summary: "CLI reference for `blackcat node` (headless node host)"
 read_when:
   - Running the headless node host
   - Pairing a non-macOS node for system.run
 title: "node"
 ---
 
-# `openclaw node`
+# `blackcat node`
 
 Run a **headless node host** that connects to the Gateway WebSocket and exposes
 `system.run` / `system.which` on this machine.
@@ -46,7 +46,7 @@ Disable it on the node if needed:
 ## Run (foreground)
 
 ```bash
-openclaw node run --host <gateway-host> --port 18789
+blackcat node run --host <gateway-host> --port 18789
 ```
 
 Options:
@@ -63,7 +63,7 @@ Options:
 Install a headless node host as a user service.
 
 ```bash
-openclaw node install --host <gateway-host> --port 18789
+blackcat node install --host <gateway-host> --port 18789
 ```
 
 Options:
@@ -80,13 +80,13 @@ Options:
 Manage the service:
 
 ```bash
-openclaw node status
-openclaw node stop
-openclaw node restart
-openclaw node uninstall
+blackcat node status
+blackcat node stop
+blackcat node restart
+blackcat node uninstall
 ```
 
-Use `openclaw node run` for a foreground node host (no service).
+Use `blackcat node run` for a foreground node host (no service).
 
 Service commands accept `--json` for machine-readable output.
 
@@ -96,17 +96,17 @@ The first connection creates a pending device pairing request (`role: node`) on 
 Approve it via:
 
 ```bash
-openclaw devices list
-openclaw devices approve <requestId>
+blackcat devices list
+blackcat devices approve <requestId>
 ```
 
 The node host stores its node id, token, display name, and gateway connection info in
-`~/.openclaw/node.json`.
+`~/.blackcat/node.json`.
 
 ## Exec approvals
 
 `system.run` is gated by local exec approvals:
 
-- `~/.openclaw/exec-approvals.json`
+- `~/.blackcat/exec-approvals.json`
 - [Exec approvals](/tools/exec-approvals)
-- `openclaw approvals --node <id|name|ip>` (edit from the Gateway)
+- `blackcat approvals --node <id|name|ip>` (edit from the Gateway)

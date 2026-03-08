@@ -33,6 +33,5 @@ cp blackcat.example.json5 ~/.blackcat/config.json5
 
 ## OpenCode Integration
 
-BlackCat is built on the same engine foundation as OpenClaw.
 If you're running Claude inside OpenCode, BlackCat integrates naturally.
 The `CLAUDE.md` file in the repo root contains agent-specific working instructions.
