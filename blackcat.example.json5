@@ -2,6 +2,11 @@
 // 7-role agent setup for the BlackCat AI daemon
 // Copy this file to your config location and customize as needed.
 {
+  skills: {
+    load: {
+      extraDirs: ["./workspaces/shared-skills"],
+    },
+  },
   agents: {
     defaults: {
       model: { primary: "gpt-4o" },

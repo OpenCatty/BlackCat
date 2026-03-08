@@ -1,0 +1,62 @@
+name: Install Smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: install-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs-scope:
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    outputs:
+      docs_only: ${{ steps.check.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs-only changes
+        id: check
+        uses: ./.github/actions/detect-docs-changes
+
+  install-smoke:
+    needs: [docs-scope]
+    if: needs.docs-scope.outputs.docs_only != 'true'
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    steps:
+      - name: Checkout CLI
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Builder
+        uses: useblacksmith/setup-docker-builder@v1
+
+      - name: Run root Dockerfile CLI smoke
+        run: |
+          docker build -t openclaw-dockerfile-smoke:local -f Dockerfile .
+          docker run --rm --entrypoint sh openclaw-dockerfile-smoke:local -lc 'which openclaw && openclaw --version'
+
+      # This smoke only validates that the build-arg path preinstalls selected
+      # extension deps without breaking image build or basic CLI startup. It
+      # does not exercise runtime loading/registration of diagnostics-otel.
+      - name: Smoke test Dockerfile with extension build arg
+        run: |
+          docker build \
+            --build-arg OPENCLAW_EXTENSIONS="diagnostics-otel" \
+            -t openclaw-ext-smoke:local -f Dockerfile .
+          docker run --rm --entrypoint sh openclaw-ext-smoke:local -lc 'which openclaw && openclaw --version'
+
+      - name: Run installer docker tests
+        env:
+          CLAWDBOT_INSTALL_URL: https://openclaw.ai/install.sh
+          CLAWDBOT_INSTALL_CLI_URL: https://openclaw.ai/install-cli.sh
+          CLAWDBOT_NO_ONBOARD: "1"
+          CLAWDBOT_INSTALL_SMOKE_SKIP_CLI: "1"
+          CLAWDBOT_INSTALL_SMOKE_SKIP_NONROOT: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+          CLAWDBOT_INSTALL_SMOKE_SKIP_PREVIOUS: "1"
+        run: bash scripts/test-install-sh-docker.sh
