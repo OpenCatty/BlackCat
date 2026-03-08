@@ -94,7 +94,7 @@ fi
 # ============================================================================
 info "Step 3: Stopping services before binary update..."
 
-$SSH_CMD "systemctl --user stop blackcat opencode 2>/dev/null || true; sleep 1"
+$SSH_CMD "systemctl --user stop blackcat 2>/dev/null || true; sleep 1"
 
 ok "Services stopped"
 
@@ -122,14 +122,13 @@ info "Step 6: Uploading service file templates..."
 
 DEPLOY_DIR="$SCRIPT_DIR/../deploy"
 $SCP_CMD "$DEPLOY_DIR/blackcat.service" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/blackcat.service"
-$SCP_CMD "$DEPLOY_DIR/opencode.service" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/opencode.service"
 
-ok "Service files uploaded to /tmp/"
+ok "Service file uploaded to /tmp/"
 
 # ============================================================================
 # Step 7: Substitute placeholders in service files
 # ============================================================================
-info "Step 7: Substituting placeholders in service files..."
+info "Step 7: Substituting placeholders in service file..."
 
 $SSH_CMD << EOF
   # blackcat.service placeholders
@@ -137,12 +136,6 @@ $SSH_CMD << EOF
   sed -i "s|__BLACKCAT_BINARY__|$BLACKCAT_BINARY|g" /tmp/blackcat.service
   sed -i "s|__DEPLOY_CONFIG_PATH__|$DEPLOY_CONFIG_PATH|g" /tmp/blackcat.service
   sed -i "s|__VAULT_PASSPHRASE__|$VAULT_PASSPHRASE|g" /tmp/blackcat.service
-
-  # opencode.service placeholders
-  sed -i "s|__DEPLOY_HOME__|$DEPLOY_HOME|g" /tmp/opencode.service
-  sed -i "s|__BLACKCAT_BINARY__|$BLACKCAT_BINARY|g" /tmp/opencode.service
-  sed -i "s|__OPENCODE_PORT__|$OPENCODE_PORT|g" /tmp/opencode.service
-  sed -i "s|__OPENCODE_BINARY__|$OPENCODE_BINARY|g" /tmp/opencode.service
 EOF
 
 ok "Placeholders substituted"
@@ -150,23 +143,22 @@ ok "Placeholders substituted"
 # ============================================================================
 # Step 8: Install service files to user systemd directory
 # ============================================================================
-info "Step 8: Installing service files to ~/.config/systemd/user/..."
+info "Step 8: Installing service file to ~/.config/systemd/user/..."
 
 $SSH_CMD << 'INSTALL_EOF'
   mkdir -p ~/.config/systemd/user
   cp /tmp/blackcat.service ~/.config/systemd/user/blackcat.service
-  cp /tmp/opencode.service ~/.config/systemd/user/opencode.service
-  rm -f /tmp/blackcat.service /tmp/opencode.service
+  rm -f /tmp/blackcat.service
 INSTALL_EOF
 
-ok "Service files installed"
+ok "Service file installed"
 
 # ============================================================================
 # Step 9: Reload and restart services
 # ============================================================================
 info "Step 9: Reloading systemd and restarting services..."
 
-$SSH_CMD "systemctl --user daemon-reload && systemctl --user restart opencode blackcat"
+$SSH_CMD "systemctl --user daemon-reload && systemctl --user restart blackcat"
 
 ok "Services restarted"
 
@@ -211,5 +203,5 @@ echo ""
 ok "Deploy complete! 🚀"
 echo -e "  ${CYAN}Host:${NC}     $DEPLOY_HOST"
 echo -e "  ${CYAN}Binary:${NC}   $BLACKCAT_BINARY"
-echo -e "  ${CYAN}Services:${NC} blackcat, opencode (user-level)"
+echo -e "  ${CYAN}Services:${NC} blackcat (user-level)"
 echo -e "  ${CYAN}Health:${NC}   $HEALTH_URL"

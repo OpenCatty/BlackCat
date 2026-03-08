@@ -48,7 +48,7 @@ for f in \
     "mcp/server.go" "mcp/client.go" \
     "cmd/daemon.go" "cmd/vault.go" "cmd/init.go" \
     "Research_Design_Architecture_InterStellar.md" \
-    "blackcat.example.yaml" \
+    "blackcat.example.json5" \
     "Dockerfile" "docker-compose.yml" ".dockerignore"; do
     if [ -f "$f" ]; then
         echo "  ✓ $f"

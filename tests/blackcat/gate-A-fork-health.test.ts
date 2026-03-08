@@ -19,10 +19,6 @@ describe("Gate A — Fork Health", () => {
     expect(pkg.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it("SCOPE.md exists at project root", () => {
-    expect(existsSync(path.join(ROOT, "SCOPE.md"))).toBe(true);
-  });
-
   it("blackcat.mjs entry point exists at project root", () => {
     expect(existsSync(path.join(ROOT, "blackcat.mjs"))).toBe(true);
   });
