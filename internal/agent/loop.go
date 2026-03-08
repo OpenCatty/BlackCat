@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/startower-observability/blackcat/internal/agentapi"
 	guardrailsPkg "github.com/startower-observability/blackcat/internal/guardrails"
 	"github.com/startower-observability/blackcat/internal/hooks"
 	"github.com/startower-observability/blackcat/internal/llm"
@@ -25,36 +26,37 @@ import (
 const defaultMaxHistoryMessages = 20
 
 type Loop struct {
-	llm                types.LLMClient
-	tools              *tools.Registry
-	scrubber           *security.Scrubber
-	memory             memory.Store
-	skills             []skills.Skill
-	hooks              *hooks.HookRegistry
-	workspace          string
-	maxTurns           int
-	sessionMessages    []types.LLMMessage
-	maxHistoryMessages int
-	maxContextTokens   int
-	compactor          *Compactor
-	agentName          string
-	sessionID          string
-	agentLanguage      string
-	agentTone          string
-	modelName          string
-	providerName       string
-	channelType        string
-	userID             string
-	coreStore          *memory.CoreStore
-	guardrails         *guardrailsPkg.Pipeline
-	interruptMgr       *InterruptManager
-	eventStream        chan<- AgentEvent
-	traceID            string
-	costTracker        *observability.CostTracker
-	reflector          *Reflector
-	prefMgr            *PreferenceManager
-	planner            *Planner
-	daemonStartedAt    time.Time
+	llm                 types.LLMClient
+	tools               *tools.Registry
+	scrubber            *security.Scrubber
+	memory              memory.Store
+	skills              []skills.Skill
+	hooks               *hooks.HookRegistry
+	workspace           string
+	maxTurns            int
+	sessionMessages     []types.LLMMessage
+	maxHistoryMessages  int
+	maxContextTokens    int
+	compactor           *Compactor
+	agentName           string
+	sessionID           string
+	agentLanguage       string
+	agentTone           string
+	modelName           string
+	providerName        string
+	channelType         string
+	userID              string
+	coreStore           *memory.CoreStore
+	guardrails          *guardrailsPkg.Pipeline
+	interruptMgr        *InterruptManager
+	eventStream         chan<- AgentEvent
+	traceID             string
+	costTracker         *observability.CostTracker
+	reflector           *Reflector
+	prefMgr             *PreferenceManager
+	planner             *Planner
+	daemonStartedAt     time.Time
+	selfKnowledgeExtras *agentapi.SelfKnowledgeExtras
 }
 
 type LoopConfig struct {
@@ -86,6 +88,8 @@ type LoopConfig struct {
 	PrefManager        *PreferenceManager         // optional, nil disables adaptive preferences
 	Planner            *Planner                   // optional, nil disables plan-and-execute
 	DaemonStartedAt    time.Time                  // zero value acceptable; snapshot builder handles zero case
+	// Phase 5: SelfKnowledgeExtras provides runtime identity data for self-knowledge queries.
+	SelfKnowledgeExtras *agentapi.SelfKnowledgeExtras
 }
 
 func NewLoop(cfg LoopConfig) *Loop {
@@ -130,35 +134,36 @@ func NewLoop(cfg LoopConfig) *Loop {
 	}
 
 	return &Loop{
-		llm:                cfg.LLM,
-		tools:              reg,
-		scrubber:           scrubber,
-		memory:             cfg.Memory,
-		skills:             cfg.Skills,
-		hooks:              cfg.Hooks,
-		workspace:          cfg.WorkspaceDir,
-		maxTurns:           maxTurns,
-		sessionMessages:    sessionMessages,
-		maxHistoryMessages: maxHistoryMessages,
-		maxContextTokens:   cfg.MaxContextTokens,
-		compactor:          compactor,
-		agentName:          cfg.AgentName,
-		sessionID:          cfg.SessionID,
-		agentLanguage:      cfg.AgentLanguage,
-		agentTone:          cfg.AgentTone,
-		modelName:          cfg.ModelName,
-		providerName:       cfg.ProviderName,
-		channelType:        cfg.ChannelType,
-		userID:             cfg.UserID,
-		coreStore:          cfg.CoreStore,
-		guardrails:         cfg.Guardrails,
-		interruptMgr:       NewInterruptManager(),
-		eventStream:        cfg.EventStream,
-		costTracker:        cfg.CostTracker,
-		reflector:          cfg.Reflector,
-		prefMgr:            cfg.PrefManager,
-		planner:            cfg.Planner,
-		daemonStartedAt:    cfg.DaemonStartedAt,
+		llm:                 cfg.LLM,
+		tools:               reg,
+		scrubber:            scrubber,
+		memory:              cfg.Memory,
+		skills:              cfg.Skills,
+		hooks:               cfg.Hooks,
+		workspace:           cfg.WorkspaceDir,
+		maxTurns:            maxTurns,
+		sessionMessages:     sessionMessages,
+		maxHistoryMessages:  maxHistoryMessages,
+		maxContextTokens:    cfg.MaxContextTokens,
+		compactor:           compactor,
+		agentName:           cfg.AgentName,
+		sessionID:           cfg.SessionID,
+		agentLanguage:       cfg.AgentLanguage,
+		agentTone:           cfg.AgentTone,
+		modelName:           cfg.ModelName,
+		providerName:        cfg.ProviderName,
+		channelType:         cfg.ChannelType,
+		userID:              cfg.UserID,
+		coreStore:           cfg.CoreStore,
+		guardrails:          cfg.Guardrails,
+		interruptMgr:        NewInterruptManager(),
+		eventStream:         cfg.EventStream,
+		costTracker:         cfg.CostTracker,
+		reflector:           cfg.Reflector,
+		prefMgr:             cfg.PrefManager,
+		planner:             cfg.Planner,
+		daemonStartedAt:     cfg.DaemonStartedAt,
+		selfKnowledgeExtras: cfg.SelfKnowledgeExtras,
 	}
 }
 
@@ -231,6 +236,13 @@ func (l *Loop) Run(ctx context.Context, userMessage string) (*Execution, error) 
 	}
 
 	toolDefs := l.tools.List()
+
+	// Structural enforcement: if the user is asking about self-knowledge
+	// (identity, capabilities, roles, skills, provider models), run the
+	// relevant tools now — before the first LLM call — and inject the results
+	// into the conversation history. This ensures the LLM always answers from
+	// runtime-backed facts rather than training-time knowledge.
+	l.enforceToolBackedSelfKnowledge(ctx, execution, userMessage)
 
 	for {
 		step := l.processOneTurn(ctx, execution, toolDefs)
@@ -519,7 +531,7 @@ func (l *Loop) buildSystemPrompt(ctx context.Context) (string, error) {
 	var runtime strings.Builder
 	runtime.WriteString("# Runtime Context\n")
 	runtime.WriteString(fmt.Sprintf("Current time: %s\n", time.Now().Format("2006-01-02 15:04:05 MST")))
-	snap := BuildSelfKnowledgeSnapshot(ctx, l, false)
+	snap := BuildSelfKnowledgeSnapshot(ctx, l, false, l.selfKnowledgeExtras)
 	runtime.WriteString(snap.CompactSummary())
 	if len(defs) > 0 {
 		runtime.WriteString(fmt.Sprintf("\nAvailable tools: %d\n", len(defs)))
