@@ -107,7 +107,7 @@ $SSH_CMD bash -s "$BLACKCAT_BINARY" << 'GOINSTALL_EOF'
   TARGET_BINARY="$1"
   export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
   mkdir -p "$(dirname "$TARGET_BINARY")"
-  CGO_ENABLED=1 go install -tags 'fts5' github.com/startower-observability/blackcat@latest
+  CGO_ENABLED=1 go install -tags 'fts5' github.com/OpenCatty/BlackCat@latest
   INSTALLED="$(go env GOPATH)/bin/blackcat"
   if [[ "$INSTALLED" != "$TARGET_BINARY" ]]; then
     cp "$INSTALLED" "$TARGET_BINARY"

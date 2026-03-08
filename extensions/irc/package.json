@@ -1,12 +1,12 @@
 {
-  "name": "@openclaw/irc",
+  "name": "@blackcat/irc",
   "version": "2026.3.3",
-  "description": "OpenClaw IRC channel plugin",
+  "description": "BlackCat IRC channel plugin",
   "type": "module",
   "dependencies": {
     "zod": "^4.3.6"
   },
-  "openclaw": {
+  "blackcat": {
     "extensions": [
       "./index.ts"
     ]

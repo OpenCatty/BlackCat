@@ -1,9 +1,9 @@
 {
-  "name": "@openclaw/discord",
+  "name": "@blackcat/discord",
   "version": "2026.3.3",
-  "description": "OpenClaw Discord channel plugin",
+  "description": "BlackCat Discord channel plugin",
   "type": "module",
-  "openclaw": {
+  "blackcat": {
     "extensions": [
       "./index.ts"
     ]

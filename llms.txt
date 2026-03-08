@@ -17,7 +17,7 @@ BlackCat is a Go-based AI agent that orchestrates OpenCode CLI via messaging cha
 ## Installation
 
 ```bash
-go install github.com/startower-observability/blackcat@latest
+go install github.com/OpenCatty/BlackCat@latest
 blackcat onboard           # interactive config wizard — creates ~/.blackcat/config.yaml
 blackcat start             # starts daemon via systemctl --user
 blackcat status            # verify daemon is running

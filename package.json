@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "description": "BlackCat — Multi-channel AI agent daemon (TypeScript rewrite)",
   "keywords": [],
-  "homepage": "https://github.com/openclaw/openclaw#readme",
+  "homepage": "https://github.com/OpenCatty/BlackCat#readme",
   "bugs": {
-    "url": "https://github.com/openclaw/openclaw/issues"
+    "url": "https://github.com/OpenCatty/BlackCat/issues"
   },
   "license": "MIT",
-  "author": "",
+  "author": "OpenCatty",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/openclaw/openclaw.git"
+    "url": "git+https://github.com/OpenCatty/BlackCat.git"
   },
   "bin": {
     "blackcat": "blackcat.mjs"
@@ -23,7 +23,6 @@
   "files": [
     "CHANGELOG.md",
     "LICENSE",
-    "openclaw.mjs",
     "README-header.png",
     "README.md",
     "assets/",
@@ -212,7 +211,7 @@
       "types": "./dist/plugin-sdk/keyed-async-queue.d.ts",
       "default": "./dist/plugin-sdk/keyed-async-queue.js"
     },
-    "./cli-entry": "./openclaw.mjs"
+    "./cli-entry": "./blackcat.mjs"
   },
   "scripts": {
     "android:assemble": "cd apps/android && ./gradlew :app:assembleDebug",

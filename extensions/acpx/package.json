@@ -1,12 +1,12 @@
 {
-  "name": "@openclaw/acpx",
+  "name": "@blackcat/acpx",
   "version": "2026.3.3",
-  "description": "OpenClaw ACP runtime backend via acpx",
+  "description": "BlackCat ACP runtime backend via acpx",
   "type": "module",
   "dependencies": {
     "acpx": "0.1.15"
   },
-  "openclaw": {
+  "blackcat": {
     "extensions": [
       "./index.ts"
     ]

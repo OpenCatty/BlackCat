@@ -1,10 +1,10 @@
 {
-  "name": "@openclaw/line",
+  "name": "@blackcat/line",
   "version": "2026.3.3",
   "private": true,
-  "description": "OpenClaw LINE channel plugin",
+  "description": "BlackCat LINE channel plugin",
   "type": "module",
-  "openclaw": {
+  "blackcat": {
     "extensions": [
       "./index.ts"
     ],
@@ -19,7 +19,7 @@
       "quickstartAllowFrom": true
     },
     "install": {
-      "npmSpec": "@openclaw/line",
+      "npmSpec": "@blackcat/line",
       "localPath": "extensions/line",
       "defaultChoice": "npm"
     }

@@ -1,18 +1,18 @@
 {
-  "name": "@openclaw/memory-core",
+  "name": "@blackcat/memory-core",
   "version": "2026.3.3",
   "private": true,
-  "description": "OpenClaw core memory search plugin",
+  "description": "BlackCat core memory search plugin",
   "type": "module",
   "peerDependencies": {
-    "openclaw": ">=2026.3.2"
+    "blackcat": ">=2026.3.2"
   },
   "peerDependenciesMeta": {
-    "openclaw": {
+    "blackcat": {
       "optional": true
     }
   },
-  "openclaw": {
+  "blackcat": {
     "extensions": [
       "./index.ts"
     ]
