@@ -1,5 +1,5 @@
 {
-  "name": "blackcat",
+  "name": "@opencatty/blackcat",
   "version": "0.1.0",
   "description": "BlackCat — Multi-channel AI agent daemon (TypeScript rewrite)",
   "keywords": [],
@@ -9,6 +9,9 @@
   },
   "license": "MIT",
   "author": "OpenCatty",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OpenCatty/BlackCat.git"
